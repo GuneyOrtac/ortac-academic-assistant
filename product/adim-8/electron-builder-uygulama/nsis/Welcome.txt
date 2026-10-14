@@ -1,0 +1,6 @@
+================================================================================
+                    AKADEMIK ASİSTAN KURULUM WIZARD'INA HOŞ GELDİNİZ!
+================================================================================
+
+    Bu asistan, akademik yazma sürecinizi kolaylaştırmak için Dr. Günay GÜNEY 
+    tarafından geliştirilmiştir. PDF dokümanlarınızı okuyabilir, özete alabilir

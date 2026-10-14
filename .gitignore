@@ -1,0 +1,54 @@
+# Python & Virtual Environments
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+
+# Node & Frontend
+node_modules/
+dev/frontend/node_modules/
+dist/
+dev/frontend/dist/
+dist-ssr/
+*.local
+
+# Environment Variables & Secrets (CRITICAL)
+.env
+.env.*
+!.env.example
+settings.json
+dev/backend/veri/settings.json
+
+# Local Data & Databases (Heavy files)
+chroma_db/
+*/chroma_db/
+*/*/chroma_db/
+*.sqlite3
+*.docx
+dev/backend/veri/chroma_db/
+dev/backend/veri/pdf_kutuphanesi/*.pdf
+!dev/backend/veri/pdf_kutuphanesi/.gitkeep
+veri/chroma_db/
+veri/pdf_kutuphanesi/
+
+# IDE & OS
+.agent/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs & Temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# External subprojects & Scratch
+MetaGPT/
+Yeni Metin Belgesi.txt
+local_agent.py
+*.yedek

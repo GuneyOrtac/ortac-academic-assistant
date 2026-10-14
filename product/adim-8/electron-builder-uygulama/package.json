@@ -1,0 +1,62 @@
+{
+  "name": "akademik-asistan",
+  "version": "1.0.0",
+  "description": "Akademik Asistan - Yerel AI destekli akademik çalışma arkadaşı\n\nBu akademik asistana yerel bir yapay zeka sistemi olarak eğitim ve araştırma amaçlı kullanılmasını öneririz.",
+  "main": "build/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start:electron": "electron .",
+    "package": "electron-builder"
+  },
+  "keywords": [
+    "academic",
+    "research",
+    "ai",
+    "assistant"
+  ],
+  "author": "Dr. Günay GÜNEY",
+  "license": "EĞİTİM VE ARAŞTIRMA KULLANIMI İÇİN BEDAVA",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {},
+  "productName": "Akademik Asistan",
+  "build": {
+    "appId": "com.akademikasistan.app",
+    "directories": {
+      "output": "../releases"
+    },
+    "files": [
+      "dist/**/*",
+      "build/**/*.js",
+      "node_modules/@modelcontextprotocol/sdk/**/*",
+      "node_modules/axios/**/*",
+      "node_modules/react/**/*",
+      "README.md",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "build/main.js",
+      "copyright": "2026 Dr. Günay GÜNEY - Tüm Hakları Saklıdır."
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"],
+          "name": "${productName} Setup v${version}"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClickInstall": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "perMachine": false
+    }
+  }
+}
