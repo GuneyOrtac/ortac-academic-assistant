@@ -68,8 +68,21 @@ Aşağıdaki REST endpoints başarıyla implement edilmiş ve çalıştırılmak
   - Aynı sorguları cache etme
   - LiteLLM kütüphanesi ile API maliyeti azaltımı
 
+### Adım 8: Masaüstü Uygulaması & GitHub Otomatik Güncelleme Motoru ✅
+- [x] **Tek Tıkla Masaüstü Başlatıcı:** [ORTAC_Akademik_Asistan.bat](file:///e:/Makale%20YZ/ORTAC_Akademik_Asistan.bat) ile arka planda backend/frontend ayağa kaldırma ve yerel app penceresi açma.
+- [x] **Electron Sarmalayıcı Mimarisi:** [product/adim-8/electron-builder-uygulama/build/main.js](file:///e:/Makale%20YZ/product/adim-8/electron-builder-uygulama/build/main.js) ile FastAPI backend yaşam döngüsü (açılışta başlat, kapanışta sonlandır) ve IPC köprüsü.
+- [x] **GitHub Releases Otomatik Güncelleme:**
+  - Backend uç noktaları: `/api/guncelleme-kontrol` ve `/api/guncelleme-uygula`
+  - Canlı Sürüm Etiketi & Parlayan Rozet (`UpdateBadge`)
+  - Arayüzden tek tıkla GitHub Releases sorgulama ve doğrudan `git pull` ile güncelleme.
+- [x] **GitHub v2.2.6 Resmi Release Yayını:** [Releases v2.2.6](https://github.com/GuneyOrtac/ortac-academic-assistant/releases/tag/v2.2.6) ilk sürümü GitHub üzerinde yayınlandı.
+
+## 🚧 Devam Eden
+- [ ] Token tasarrufu optimizasyonları
+  - Aynı sorguları cache etme
+  - LiteLLM kütüphanesi ile API maliyeti azaltımı
+
 ## 🔜 Bekleyen (Bkz: roadmap.md)
-- Adım 8: Electron masaüstü .exe + otomatik güncelleme
 - Adım 9: Auth & Lisanslama sistemi
 - Adım 10: Token/Maliyet paneli
 - Adım 11: .akpack P2P senkronizasyon paketi
