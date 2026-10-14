@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Loader2, Key, Cpu, Plus, Trash2, HardDrive, RefreshCw } from 'lucide-react';
+import { Save, Loader2, Key, Cpu, Plus, Trash2, HardDrive, RefreshCw, GitBranch, Download } from 'lucide-react';
 
 interface ModelTaskConfig {
   label: string;
@@ -29,6 +29,47 @@ export default function SettingsTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  
+  // GitHub Güncelleme State
+  const [updateStatus, setUpdateStatus] = useState<any>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState('');
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateMsg('');
+    try {
+      const res = await fetch('http://localhost:8000/api/guncelleme-kontrol');
+      if (res.ok) {
+        const data = await res.json();
+        setUpdateStatus(data);
+      }
+    } catch {
+      setUpdateMsg('GitHub sunucusuna bağlanılamadı.');
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const handleApplyUpdate = async () => {
+    if (!window.confirm("GitHub'daki en son sürüm çekilerek sistem güncellenecektir. Onaylıyor musunuz?")) return;
+    setUpdating(true);
+    setUpdateMsg('');
+    try {
+      const res = await fetch('http://localhost:8000/api/guncelleme-uygula', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setUpdateMsg(data.mesaj || 'Güncelleme başarıyla tamamlandı!');
+      } else {
+        setUpdateMsg(data.detail || 'Güncelleme hatası.');
+      }
+    } catch (e: any) {
+      setUpdateMsg('Bağlantı hatası: ' + e.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   useEffect(() => {
     fetch('http://localhost:8000/api/ayarlar')
@@ -289,6 +330,87 @@ export default function SettingsTab() {
           >
             <RefreshCw size={14} /> Kurulum Sihirbazını Yeniden Başlat
           </button>
+        </div>
+
+        {/* GitHub Otomatik Güncelleme ve Sürüm Kontrolü */}
+        <div style={{ backgroundColor: 'var(--bg-color)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-color)', gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <GitBranch size={16} style={{ color: 'var(--accent-color)' }} />
+                GitHub Otomatik Güncelleme ve Sürüm Kontrolü (Adım 8)
+              </h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Doğrudan GitHub Releases (GuneyOrtac/ortac-academic-assistant) üzerinden yeni özellikleri denetleyin ve tek tıkla güncelleyin.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={handleCheckUpdate}
+                disabled={checkingUpdate}
+                style={{
+                  backgroundColor: '#27272a',
+                  color: '#f4f4f5',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {checkingUpdate ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                Güncellemeleri Denetle
+              </button>
+              <button
+                onClick={handleApplyUpdate}
+                disabled={updating}
+                style={{
+                  backgroundColor: 'var(--accent-color)',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {updating ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                GitHub'dan Şimdi Güncelle (Git Pull)
+              </button>
+            </div>
+          </div>
+
+          {updateMsg && (
+            <div style={{ padding: '10px 14px', borderRadius: '6px', backgroundColor: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', fontSize: '13px' }}>
+              {updateMsg}
+            </div>
+          )}
+
+          {updateStatus && (
+            <div style={{ padding: '12px 16px', borderRadius: '6px', backgroundColor: updateStatus.guncel_mi ? 'rgba(16,185,129,0.08)' : 'rgba(59,130,246,0.12)', border: updateStatus.guncel_mi ? '1px solid rgba(16,185,129,0.25)' : '1px solid #3b82f6', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, color: updateStatus.guncel_mi ? '#34d399' : '#60a5fa' }}>
+                  {updateStatus.guncel_mi ? '✓ Sisteminiz en son sürümde (v2.2.6) çalışıyor.' : `🚀 Yeni Sürüm Mevcut: v${updateStatus.son_surum}`}
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  Mevcut: v{updateStatus.mevcut_surum} • GitHub: v{updateStatus.son_surum}
+                </span>
+              </div>
+              {updateStatus.surum_notlari && !updateStatus.guncel_mi && (
+                <div style={{ whiteSpace: 'pre-wrap', fontSize: '12px', color: '#cbd5e1', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '4px' }}>
+                  {updateStatus.surum_notlari}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

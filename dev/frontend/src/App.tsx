@@ -29,6 +29,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
+  const [appUpdateInfo, setAppUpdateInfo] = useState<any>(null);
   
   // Chat State
   const [messages, setMessages] = useState<Message[]>([
@@ -149,7 +150,20 @@ function App() {
       }
     };
 
+    const checkGitHubUpdate = async () => {
+      try {
+        const uRes = await fetch(`${API_URL}/api/guncelleme-kontrol`);
+        if (uRes.ok) {
+          const uData = await uRes.json();
+          setAppUpdateInfo(uData);
+        }
+      } catch (e) {
+        console.error("Güncelleme kontrolü yapılamadı:", e);
+      }
+    };
+
     checkSetupStatus();
+    checkGitHubUpdate();
     fetchDashboardData();
     fetchLibraryData();
     handleRadarSearch(radarQuery);
@@ -413,8 +427,35 @@ function App() {
             {activeTab === 'draft' && "OpenDraft Makale Motoru"}
             {activeTab === 'settings' && "Ayarlar"}
           </div>
-          <div style={{fontSize: '12px', display: 'flex', gap: '8px', alignItems:'center'}}>
-            <span>Sistem: Aktif</span>
+          <div style={{fontSize: '12px', display: 'flex', gap: '12px', alignItems:'center'}}>
+            <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ height: '7px', width: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+              Sistem: Aktif
+            </span>
+            {appUpdateInfo && appUpdateInfo.guncel_mi === false ? (
+              <span 
+                onClick={() => setActiveTab('settings')}
+                style={{
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  border: '1px solid #3b82f6',
+                  color: '#60a5fa',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '11px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                🚀 Yeni Güncelleme: v{appUpdateInfo.son_surum}
+              </span>
+            ) : (
+              <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                v2.2.6 (Güncel ✓)
+              </span>
+            )}
           </div>
         </div>
 

@@ -486,6 +486,76 @@ async def reset_onboarding():
     model_factory.save_settings(settings)
     return {"mesaj": "Kurulum durumu sıfırlandı."}
 
+GITHUB_REPO = "GuneyOrtac/ortac-academic-assistant"
+CURRENT_VERSION = "2.2.6"
+
+@app.get("/api/guncelleme-kontrol")
+async def check_github_update():
+    """GitHub Releases üzerinden en son sürümü ve değişiklikleri denetler."""
+    import requests
+    try:
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+        headers = {"User-Agent": "AcademicAssistant-Updater"}
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            remote_tag = data.get("tag_name", f"v{CURRENT_VERSION}").lstrip("v")
+            
+            # Semver karşılaştırması
+            is_newer = False
+            try:
+                r_parts = [int(p) for p in remote_tag.split(".")]
+                l_parts = [int(p) for p in CURRENT_VERSION.split(".")]
+                is_newer = r_parts > l_parts
+            except Exception:
+                is_newer = remote_tag != CURRENT_VERSION
+
+            return {
+                "guncel_mi": not is_newer,
+                "mevcut_surum": CURRENT_VERSION,
+                "son_surum": remote_tag,
+                "yayin_tarihi": data.get("published_at", ""),
+                "surum_notlari": data.get("body", "Yeni sürüm yayınlandı."),
+                "indir_url": data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases"),
+                "release_adi": data.get("name", f"Akademik Asistan v{remote_tag}")
+            }
+        else:
+            return {
+                "guncel_mi": True,
+                "mevcut_surum": CURRENT_VERSION,
+                "son_surum": CURRENT_VERSION,
+                "mesaj": "GitHub'da sürüm denetlendi. Sistem güncel."
+            }
+    except Exception as e:
+        return {
+            "guncel_mi": True,
+            "mevcut_surum": CURRENT_VERSION,
+            "son_surum": CURRENT_VERSION,
+            "hata": str(e)
+        }
+
+@app.post("/api/guncelleme-uygula")
+async def apply_github_update():
+    """Doğrudan GitHub'dan en güncel kodları (git pull) çeker."""
+    import subprocess
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    try:
+        res = subprocess.run(
+            ["git", "pull", "origin", "main"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        output = (res.stdout or "") + (res.stderr or "")
+        return {
+            "durum": "basarili" if res.returncode == 0 else "hata",
+            "cikti": output,
+            "mesaj": "GitHub üzerinden en son güncellemeler başarıyla çekildi!" if res.returncode == 0 else "Güncelleme sırasında hata oluştu."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Güncelleme uygulanamadı: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     # Backend'i ayağa kaldırıyoruz
