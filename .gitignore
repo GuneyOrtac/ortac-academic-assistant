@@ -67,3 +67,5 @@ product/adim-8/electron-builder-uygulama/backend/
 product/adim-8/electron-builder-uygulama/dist/
 *.spec
 
+# Testing & Sandbox
+.sandbox_circuit_breaker.json

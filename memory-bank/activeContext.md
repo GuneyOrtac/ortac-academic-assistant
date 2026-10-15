@@ -1,91 +1,63 @@
-# Aktif Bağlam
+# Aktif Bağlam (Active Context)
+> **Son Güncelleme:** 16 Ekim 2026 (Gece Seansı Sonu)  
+> **Durum:** Temel Altyapı Hazır, Temiz Oda Test Motoru Doğrulandı, Yarınki Seans İçin Zemin Kuruldu.
 
-## ✅ Gelecek Seans İçin Kalıpları
+---
 
-### ActiveContext Kullanımı
-- **Görev başında:** `memory-bank/activeContext.md` oku → bağlamdan habert al
-- **Görev sonunda:** Aynı dosyaya yeni durum bilgisi ekle (sınırsız satır)
-- **Kural:** Geçici bağlam bilgisi `decisions.md`, `techContext.md`, `progress.md`'ye taşınarak aktif bağlamma (activeContext) kalacak.
+## 📌 1. Mevcut Durum Özeti & Kazanımlar
 
-## Şu An Çalışılan (Aktif Durum Bilgisi - Gelecek Seans İçin Kalacak)
+Bu seansta masaüstü uygulamasının paketlenmesi, dağıtımı, canlı güncellenmesi ve test güvenliği üzerine kapsamlı bir atılım gerçekleştirildi:
 
-### 1. Current Work
-Kullanıcı backend ve frontend sunucularını terminalde başlatmamı istedi. İki sunucu da başarıyla çalışıyor:
-- Backend (FastAPI + Uvicorn): Port 8000'de çalışıyor
-- Frontend (Vite + React SPA): Port 5173'te çalışıyor
+1. **Adım 8 (Masaüstü Paketleme & Otomatik Dağıtım) Tamamlandı:**
+   - Electron sarmalayıcısı (`product/adim-8/electron-builder-uygulama`) ile FastAPI backend'i PyInstaller ile derlenerek `backend-server.exe` olarak Electron extraResources altına gömüldü.
+   - NSIS tek tıkla kurulum sihirbazı (`ORTAC.Akademik.Asistan.Setup.0.0.3.exe` - 455 MB) ve taşınabilir zip (`ORTAC.Akademik.Asistan.0.0.3-win.zip` - 392 MB) üretildi.
+   - GitHub Releases API üzerinden resmi `v0.0.1`, `v0.0.2` ve `v0.0.3` sürümleri canlıya alındı.
 
-Sonrasında, projenin gelecekte yapılacak işleme dair yol haritasını (roadmap) kullanıcıya sundum. Dosyayı okudum ve proje vizyonu, yakın/orta/uzun vadeli hedeflerini paylaştım.
+2. **Uygulama İçi Canlı Akış Güncelleyicisi (In-App Streaming Updater):**
+   - Kullanıcıyı tarayıcı indirme sayfasına yönlendirme (`webbrowser.open`) yaklaşımı terk edildi.
+   - Backend üzerinde arka plan iş parçacığı (`_download_and_launch_installer`) ve `/api/guncelleme-durum` endpoint'i yazıldı.
+   - Arayüzde (`SettingsTab.tsx`) canlı `%` ve `MB / Toplam MB` ilerleme çubuğu eklendi.
+   - İndirme bittiğinde Windows API'si (`os.startfile`) ile kurulum dosyası otomatik başlatılır hale getirildi.
 
-### 2. Key Technical Concepts
-- **Backend:** FastAPI (Python), Uvicorn (ASGI sunucu), Pydantic (veri validasyonu)
-- **Frontend:** Vite (development build tool), React, TypeScript
-- **Veritabanı:** ChromaDB (lokal vektör veritabanı: `veri/chroma_db`)
-- **RAG (Retrieval Augmented Generation):** PDF yükleme, vektörizasyon, semantik arama
-- **MCP (Model Context Protocol):** Araç entegrasyonları için kütüphane sistemi
-- **OpenAlex:** Literatür tarama API'si
-- **Auth & Lisanslama:** Bcrypt/argon2, HWID doğrulama, lisans anahtarı sistemi
+3. **Hızlı GitHub Dağıtım Boru Hattı:**
+   - PowerShell `HttpClient`'ın büyük dosyalarda (450+ MB) `chunked` transfer takılma sorunu çözüldü.
+   - Python `requests` ve katı `Content-Length` başlığı kullanan `tools/upload_release_fast.py` ile GitHub Releases yüklemeleri ~2.5 MB/s hızla canlı yüzde göstergesiyle stabilize edildi.
 
-### 3. Relevant Files and Code
-#### `dev/backend/main.py`
-- FastAPI uygulamasının ana router dosyası
-- PDF yükleme, kütüphane yönetimi, semantik arama, sohbet endpoint'leri içeriyor
-- MCP araçları entegrasyonu (`mcp-araclar`, `mcp-baglan`)
-- Literatur tarama (`literatur-tara`)
+4. **Model Hiyerarşisi & Sürücü Koruması:**
+   - Google tarafından kullanımdan kaldırılan ve 404 veren `gemini-2.5-flash` modelinden `gemini-3.5-flash` (RAG & Sohbet) ve `gemini-3.5-flash-lite` (PDF metadata) modellerine geçildi.
+   - Hugging Face önbellekleri (`HF_HOME`, `TORCH_HOME`) kullanıcının seçtiği hedef sürücüye (`veri/modeller/hf`) kilitlendi; `C:\Users\` altına sızıntı önlendi.
 
-#### `dev/frontend/package.json`
-Vite + React yapısı, build script'leri
+---
 
-#### `memory-bank/roadmap.md`
-Projenin vizyonu ve gelecekte yapılacak işlere dair detaylı yol haritası:
-- **Adım 8:** Electron .exe sarmalayıcısı, otomatik güncelleme
-- **Adım 9:** Auth & lisanslama sistemi
-- **Adım 10:** Token/maliyet paneli
-- **Adım 11:** .akpack P2P senkronizasyon
-- **Adım 12:** Admin dashboard (GitHub-merkezi)
-- **Orta Vadeli:** Otonom avcı modülü, Unified PDF Parser, Agentic RAG
+## 🛡️ 2. Temiz Oda Test Çerçevesi & Devre Kesici (Clean-Room Framework)
 
-### 4. Problem Solving
-✅ Backend sunucusu başarıyla başlatıldı ve çalışıyor durumda  
-✅ Frontend sunucusu başarıyla başlatıldı ve çalışıyor durumda  
-✅ API çağrıları başarılı (kütüphane listesi, mcp araçları, semantik arama)  
+Yazılım geliştirme sürecinin kobaysız, hatasız ve kısır döngüsüz yürütülmesi için kurulan evrensel altyapı:
 
-### 5. Pending Tasks and Next Steps
+- **Dokümantasyon:** [`CLEAN_ROOM_SANDBOX_TESTING_FRAMEWORK.md`](file:///e:/Makale%20YZ/CLEAN_ROOM_SANDBOX_TESTING_FRAMEWORK.md) kök dizinde tüm projelere uyarlanabilir bir şablon olarak hazırlandı.
+- **Devre Kesici (HITL Circuit Breaker):** [`tools/circuit_breaker.py`](file:///e:/Makale%20YZ/tools/circuit_breaker.py) oluşturuldu. Üst üste 2 başarısızlıkta veya mimari kararlarda otonom döngüyü kesip kullanıcıya karar seçeneği sunar.
+- **7 Kalite Kapısı Test İstasyonu:** [`tools/run_sandbox_test.py`](file:///e:/Makale%20YZ/tools/run_sandbox_test.py) oluşturuldu ve çalıştırılarak **%100 PASS (7/7 Başarı)** teyit edildi:
+  1. *QG-1 & QG-2:* Hedef sürücü izolasyonu & model önbellek karantinası.
+  2. *QG-3:* Dış veri çekimi ve göreceli URL çözümleme (DergiPark / OpenAlex).
+  3. *QG-4:* ChromaDB vektör kalıcılığı ve chunk kaydı.
+  4. *QG-5:* Semantik geri çağırma (retrieval) doğrulaması.
+  5. *QG-6:* Gemini 3.5 model hiyerarşisi yapılandırması.
+  6. *QG-7:* Canlı güncelleme ve arka plan stream motoru.
+  7. *Karantina Sonu:* Geçici sanal dizinin tek bayt kalıntı bırakmadan imhası.
 
-#### Yürüten Terminal İşleri:
-```powershell
-# Backend (FastAPI + Uvicorn - port 8000)
-python "E:\Makale YZ\dev\backend\main.py"
+---
 
-# Frontend (Vite React SPA - port 5173)
-cd "E:\Makale YZ\dev\frontend" ; npm run dev
-```
+## 🚀 3. Yarınki Seans İçin Temel Yol Haritası (Resume Plan)
 
-#### İlk Çalıştırmak İçin:
-**Backend için:**
-```powershell
-pip install -r "E:\Makale YZ\dev\backend\requirements.txt"
-python "E:\Makale YZ\dev\backend\main.py"
-```
+Yarın doğrudan çalışan bir sürüm üretmek üzere izlenecek somut adımlar:
 
-**Frontend için (ilk kez):**
-```powershell
-cd "E:\Makale YZ\dev\frontend" ; npm install
-npm run dev
-```
-
-#### Gelecek İşler (Roadmap'dan):
-1. **Adım 8:** Electron sarmalayıcısı, process lifecycle yönetimi, GitHub Releases API ile otomatik güncelleme
-2. **Adım 9:** Kimlik doğrulama ve lisanslama sistemi ekleme
-3. **Adım 10:** Token/maliyet paneli implementasyonu
-4. **Adım 11:** .akpack P2P senkronizasyon sistemi
-5. **Adım 12:** Admin dashboard (GitHub-merkezi telemetry)
-
-6. **Orta Vadeli Hedefler:** Otonom avcı modülü, Unified PDF Parser, Agentic RAG, "Bana Öğret" modülü
-7. **Uzun Vadeli:** Docker konteynerizasyon, yedekleme stratejisi, MCP entegrasyonları (GIS, ArcGIS Pro, MATLAB, Zotero)
-
-### 8. Project Vision & Roadmap Summary
-Proje basit bir PDF kütüphanesinden "kendi kendine öğrenen" Akademik Çalışma Arkadaşı'na dönüşecek:
-
-**Vizyon:** Basit PDF kütüphanesi → otonom akademik çalışma arkadaşı
-
-**Referanslar:** PASA (atıf ağı), Resophy (PDF parser), ScholarLens (Agentic RAG), OpenDraft (sıfır halüsinasyon)
+1. **Temiz Oda Doğrulaması:**
+   - İlk adım olarak `python tools/run_sandbox_test.py` çalıştırılarak temel fonksiyonların yeşil olduğu teyit edilecek.
+2. **Kullanıcı Hedef Sürücüsü ile Uçtan Uca Doğrulama:**
+   - Kullanıcının `F:\AkademikAsistan\veri\chroma_db` hedef sürücüsündeki yazma/okuma döngüsü gerçek PDF yüklemesiyle test edilecek.
+   - OpenAlex'ten indirilen makalenin kütüphaneye ve ChromaDB'ye eksiksiz aktığı teyit edilecek.
+3. **Electron UI Duman Testi (Headless Smoke Test):**
+   - Electron başlatıldığında React arayüzünün konsol hatası vermeden render olduğu otomatik olarak doğrulanacak.
+4. **Delta (Sıcak Yama) Güncelleme Entegrasyonu:**
+   - Küçük güncellemeler için 450 MB setup yerine 2 MB ZIP ile sıcak yama mekanizması devreye alınacak.
+5. **v0.0.4 Kararlı Üretim Sürümü:**
+   - Tüm 7 kalite kapısı ve UI duman testi onaylandığında GitHub'a yeni stabil sürüm basılacak.

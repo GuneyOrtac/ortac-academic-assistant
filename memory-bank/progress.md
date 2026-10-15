@@ -1,90 +1,73 @@
-# İlerleme
+# İlerleme (Progress)
 
-## ✅ Tamamlanan (MVP Çekirdeği)
+## ✅ Tamamlanan Aşamalar
 
-### Adım 1: PDF İşleme & Ayrıştırma
-- [x] PyMuPDF ile PDF yükleme ve metin çıkarma
-- [x] Gemini 3.1 Flash-Lite entegrasyonu (PDF künye analizi)
+### Adım 1: PDF İşleme & Ayrıştırma ✅
+- [x] PyMuPDF (fitz) ile PDF yükleme ve metin çıkarma
+- [x] Google Gemini 3.5 Flash-Lite entegrasyonu (PDF künye analizi)
 - [x] Otomatik Türkçe özet oluşturma
 - [x] APA 7 formatında kaynakça üretimi
-- [x] Akıllı dosya adı: `Yazar_Yıl_Başlık.pdf`
+- [x] Akıllı dosya adı oluşturma: `Yazar_Yıl_Başlık.pdf`
 
-### Adım 2: RAG & Vektör Veritabanı
-- [x] ChromaDB kurulumu (`veri/chroma_db` dizini)
-- [x] Chunking stratejisi (1000 char, 200 overlap)
-- [x] all-MiniLM-L6-v2 embedding modeli entegrasyonu
-- [x] Semantik arama endpoint'leri implementasyonu
+### Adım 2: RAG & Vektör Veritabanı ✅
+- [x] ChromaDB dinamik kurulumu (`veri/chroma_db` dizini)
+- [x] Chunking stratejisi (1000 karakter, 200 overlap)
+- [x] all-MiniLM-L6-v2 ve bge-m3 embedding modeli entegrasyonu
+- [x] Semantik benzerlik arama endpoint'leri implementasyonu
 
-### Adım 3: RAG & Sohbet Motoru
-- [x] Gemini 3.8 Flash bağlantısı (Ana RAG motoru)
-- [x] Selective Context stratejisi (ilgili metin parçaları)
+### Adım 3: RAG & Sohbet Motoru ✅
+- [x] Gemini 3.5 Flash bağlantısı (Ana RAG motoru)
+- [x] Selective Context stratejisi (en alakalı metin parçacıkları)
 - [x] OpenDraft motoru → Word (.docx) çıktısı üretimi
 
-### Adım 4: Arayüz Uygulaması
+### Adım 4: Arayüz Uygulaması (React 19 + TypeScript) ✅
 - [x] React 19 + Vite 8 + TypeScript kurulumu
 - [x] PDF okuyucu (sol panel) + Chat widget'ı mizanpajı
 - [x] Jodit Editor entegrasyonu (makale düzenleme workspace)
-- [x] Literatür Radarı bileşeni
-- [x] SettingsTab (ayarlar panosu)
+- [x] Literatür Radarı bileşeni (OpenAlex entegrasyonu)
+- [x] SettingsTab (ayarlar panosu ve canlı donanım durumu)
 
-### Adım 5: Backend API (FastAPI) - Tüm Endpoint'ler ✅
-Aşağıdaki REST endpoints başarıyla implement edilmiş ve çalıştırılmakta:
+### Adım 5: Backend API (FastAPI) - Tüm Temel Endpoint'ler ✅
+- [x] `/api/pdf-yukle`, `/api/kutuphane`, `/api/ara`, `/api/sohbet`, `/api/taslak-olustur`
+- [x] `/api/literatur-tara` (OpenAlex literatür taraması)
+- [x] `/api/pdf-indir-ve-ekle` (URL'den göreceli ve mutlak bağlantı çözümleyerek PDF indirme + kütüphaneye ekleme)
+- [x] `/api/mcp-baglan`, `/api/mcp-araclar` (MCP mimarisi)
+- [x] `/api/ayarlar`, `/api/sistem-bilgisi`, `/api/kurulum-tamamla`
 
-| METOD | Endpoint | Açıklama |
-|-------|----------|-----------|
-| GET | `/` | Sistem durumu / anasayfa |
-| POST | `/api/pdf-yukle` | PDF yükleme, metin çıkarma + vektörizasyon |
-| GET | `/api/kutuphane` | Kütüphane dosya listesi |
-| DELETE | `/api/kutuphane/{file_id}` | Dosya silme |
-| GET | `/api/pdf/{file_id}` | PDF dosyasını indirme |
-| POST | `/api/ara` | Anlamsal arama (semantic search) |
-| POST | `/api/sohbet` | Sohbet cevabı (kaynak gösterimli RAG) |
-| POST | `/api/taslak-olustur` | Makale taslağı → .docx indir |
-| POST | `/api/literatur-tara` | OpenAlex API ile literatür taraması |
-| POST | `/api/pdf-indir-ve-ekle` | URL'den PDF indirme + ekleme |
-| POST | `/api/mcp-baglan` | MCP sunucusu bağlantısı |
-| GET | `/api/mcp-araclar` | MCP araçları listesi |
-| GET/POST | `/api/ayarlar` | Model/MCP ayarlarını yükle/kaydet |
-
-### Adım 6: Frontend (Vite React SPA) ✅
-- [x] Temel yapı kurulması
-  - Vite 8 dev server (port 5173)
-  - React 19 + TypeScript
-  - Tailwind CSS styling
-
-### Adım 7: Profesyonel Kurulum Sihirbazı (Onboarding Wizard) & Donanım Teşhisi ✅
+### Adım 6: Profesyonel Kurulum Sihirbazı (Onboarding Wizard) ✅
 - [x] Dinamik Donanım & Disk Tespiti (`psutil` ile RAM, çekirdek, sürücü boş alan analizi)
-- [x] 4 Kademeli Kurulum Akışı:
-  1. Model ve Donanım Analizi (`bge-m3`, `e5-small`, `qwen2-7b`, `cloud-gemini`)
-  2. Yapay Zeka API Tercihi (Dahili Havuz vs Bağımsız Gemini/DeepSeek API Anahtarı)
-  3. Kütüphane Dizini ve Disk Güvence Kontrolü (Seçilen Model + 20 GB RAG Payı kuralı ve buton kilidi)
-  4. Kurulum Tamamlandı ve Doğrulama Listesi
-- [x] %100 Türkçe, Linear & Raycast Obsidian Karanlık Tasarımı, Sabit Kadraj, Sol Üst Kurumsal Logo
-- [x] Dinamik ChromaDB ve PDF Kütüphanesi Dizin Yapılandırması (`settings.json`)
-- [x] Sihirbazı Ayarlar Ekranından Yeniden Başlatabilme Desteği (`/api/kurulum-sifirla`)
+- [x] 4 Kademeli Kurulum Akışı (Model seçimi, API tercihi, hedef disk alanı kontrolü)
+- [x] %100 Türkçe, Obsidian Karanlık Tasarımı, Kurumsal Logo
 
-## 🚧 Devam Eden
-- [ ] Token tasarrufu optimizasyonları
-  - Aynı sorguları cache etme
-  - LiteLLM kütüphanesi ile API maliyeti azaltımı
+### Adım 7: Masaüstü Paketleme & Dağıtım (Electron + PyInstaller) ✅
+- [x] **PyInstaller Backend:** `main.py` ve tüm bağımlılıklar `backend-server.exe` olarak derlendi.
+- [x] **Electron Mimarisi:** Arka planda FastAPI backend'ini otomatik başlatan ve kapanışta sonlandıran Electron sarmalayıcısı.
+- [x] **NSIS Setup & Portable Zip:** `ORTAC.Akademik.Asistan.Setup.0.0.3.exe` (455 MB) ve taşınabilir zip (392 MB).
+- [x] **GitHub Dağıtımı:** `v0.0.1`, `v0.0.2` ve `v0.0.3` sürümleri GitHub Releases üzerinde yayınlandı.
 
-### Adım 8: Masaüstü Uygulaması & GitHub Otomatik Güncelleme Motoru ✅
-- [x] **Tek Tıkla Masaüstü Başlatıcı:** [ORTAC_Akademik_Asistan.bat](file:///e:/Makale%20YZ/ORTAC_Akademik_Asistan.bat) ile arka planda backend/frontend ayağa kaldırma ve yerel app penceresi açma.
-- [x] **Electron Sarmalayıcı Mimarisi:** [product/adim-8/electron-builder-uygulama/build/main.js](file:///e:/Makale%20YZ/product/adim-8/electron-builder-uygulama/build/main.js) ile FastAPI backend yaşam döngüsü (açılışta başlat, kapanışta sonlandır) ve IPC köprüsü.
-- [x] **GitHub Releases Otomatik Güncelleme:**
-  - Backend uç noktaları: `/api/guncelleme-kontrol` ve `/api/guncelleme-uygula`
-  - Canlı Sürüm Etiketi & Parlayan Rozet (`UpdateBadge`)
-  - Arayüzden tek tıkla GitHub Releases sorgulama ve doğrudan `git pull` ile güncelleme.
-- [x] **GitHub v0.0.1 Resmi Release Yayını:** [Releases v0.0.1](https://github.com/GuneyOrtac/ortac-academic-assistant/releases/tag/v0.0.1) ilk sürümü GitHub üzerinde yayınlandı.
+### Adım 8: Uygulama İçi Canlı Akış Güncelleyicisi (In-App Live Updater) ✅
+- [x] Tarayıcı yönlendirmesi yerine backend üzerinden `requests.get(stream=True)` ile arka plan indirmesi.
+- [x] Arayüzde anlık canlı ilerleme çubuğu (% ve MB göstergesi).
+- [x] İndirme tamamlandığında `os.startfile` ile kurulum sihirbazını otomatik başlatma.
 
-## 🚧 Devam Eden
-- [ ] Token tasarrufu optimizasyonları
-  - Aynı sorguları cache etme
-  - LiteLLM kütüphanesi ile API maliyeti azaltımı
+### Adım 9: Temiz Oda Test Çerçevesi & Devre Kesici (Clean-Room CI/CD) ✅
+- [x] [`CLEAN_ROOM_SANDBOX_TESTING_FRAMEWORK.md`](file:///e:/Makale%20YZ/CLEAN_ROOM_SANDBOX_TESTING_FRAMEWORK.md) evrensel mimari standardı.
+- [x] [`tools/circuit_breaker.py`](file:///e:/Makale%20YZ/tools/circuit_breaker.py) ile otonom kısır döngü kalkanı (Maksimum 2 hata, ardından insan müdahalesi).
+- [x] [`tools/run_sandbox_test.py`](file:///e:/Makale%20YZ/tools/run_sandbox_test.py) ile 7 Aşamalı Kalite Kapısı doğrulaması (%100 PASS).
 
-## 🔜 Bekleyen (Bkz: roadmap.md)
-- Adım 9: Auth & Lisanslama sistemi
-- Adım 10: Token/Maliyet paneli
-- Adım 11: .akpack P2P senkronizasyon paketi
-- Adım 12: GitHub-merkezli Admin Dashboard
+---
 
+## 🚧 Devam Eden & Yarınki Öncelikler
+
+- [ ] **Kullanıcı Hedef Sürücüsünde Uçtan Uca Doğrulama:** `F:\AkademikAsistan\veri` hedef dizininde tam döngü testi.
+- [ ] **Görsel & Arayüz Duman Testi (Headless UI Smoke Test):** Electron arayüzünün konsol hatasız açıldığının otomasyonu.
+- [ ] **Delta (Sıcak Yama) Güncellemesi:** 455 MB yerine 2 MB ZIP ile hızlı yama mekanizması.
+- [ ] **v0.0.4 Kararlı Üretim Sürümü:** Temiz oda testlerinden tam not alan yeni sürümün dağıtımı.
+
+---
+
+## 🔜 Gelecek Yol Haritası
+- Adım 10: Auth & Lisanslama sistemi (HWID tabanlı lisans doğrulama)
+- Adım 11: Token & Maliyet paneli (LiteLLM cache)
+- Adım 12: .akpack P2P senkronizasyon paketi
+- Adım 13: GitHub-merkezli Admin Dashboard

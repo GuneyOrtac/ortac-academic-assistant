@@ -1,50 +1,54 @@
-# Teknoloji Bağlamı
+# Teknoloji Bağlamı (Tech Context)
 
-## Backend Stack
-| Kütüphane | Kullanım | Not |
-|-----------|----------|------|
-| Python 3.13 | Ana diller | - |
-| FastAPI | REST API server | Otomatik dokümantasyon, validation |
-| LangChain (langchain-huggingface) | Orchestration | Vektör zنجارları, LLM zincirleri |
-| Pydantic | Schema validation | Girdi doğrulama |
-| PyMuPDF (fitz) | PDF parsing | Metin çıkarma, sayfa okuma |
+## 🖥️ Arka Yüz (Backend Stack)
+| Kütüphane / Teknoloji | Rol | Açıklama |
+|---|---|---|
+| **Python 3.13** | Ana Çalışma Zamanı | Çekirdek mantık ve yapay zekâ motoru |
+| **FastAPI** | REST API Sunucusu | Asenkron uç noktalar, OpenAPI dökümantasyonu |
+| **Uvicorn** | ASGI Sunucusu | Yüksek performanslı web sunucusu |
+| **PyInstaller** | Masaüstü Paketleme | `backend-server.exe` olarak Electron içine gömülü dağıtım |
+| **LangChain Core & HuggingFace** | RAG Orkestrasyonu | Chunking, prompt şablonları, vektör indeksleme |
+| **PyMuPDF (fitz)** | PDF Ayrıştırma | Metin çıkarma, sayfa analizi ve künye tespiti |
+| **Pydantic v2** | Veri Doğrulama | Şema kontrolü ve katı JSON parser |
+| **psutil** | Sistem Teşhisi | Donanım, RAM, CPU ve disk alanı tespiti |
 
-## Frontend Stack
-| Kütüphane | Sürüm | Rol |
-|-----------|-------|-----|
-| React 19 | Latest | UI framework |
-| Vite 8 | Dev server | Hızlı geliştirme ortamı |
-| TypeScript | - | Typed JavaScript |
-| Jodit Editor | - | Word workspace, makale düzenleme |
-| Lucide React | - | İkon kütüphanesi |
-| Swiper | - | Slider/çeşitli görseller |
+---
 
-## Yapay Zeka Layerları (Agentic Routing)
-| Katiagory | Model | Kullanım Alanı | Neden |
-|-----------|-------|------------------|--------|
-| Hızlı PDF Analizi | gemini-3.1-flash-lite | Künye analizi, hızlı tasnif | ucuz & hızlı (250M token/1000 TL) |
-| Ana RAG Motoru | gemini-3.8-flash | Sohbet, RAG, makale taslağı | Yüksek bağlam penceresi (gelişmiş sentez) |
-| Derin Zekâ Layerı | DeepSeek-R1 | Formül açıklama, sentez | Chain-of-thought, mantık zinciri |
+## 🎨 Ön Yüz (Frontend Stack)
+| Kütüphane / Teknoloji | Sürüm | Rol |
+|---|---|---|
+| **Electron** | 41.x | Masaüstü işletim sistemi köprüsü, pencere yönetimi, IPC |
+| **React** | 19.x | Kullanıcı arayüzü bileşenleri |
+| **Vite** | 8.x | Modern ve ultra hızlı build motoru |
+| **TypeScript** | 5.x | Tip güvenliği ve ölçeklenebilir kodlama |
+| **Tailwind CSS** | 4.x | Obsidian Karanlık Mod ve modern stil sistemi |
+| **Jodit Editor** | Entegre | Makale yazım alanı ve Word (.docx) workspace |
+| **Lucide React** | - | Modern arayüz ikonları |
 
-## Veri Saklama & Vektör
-| Tip | Teknoloji | Konum/Gözlem |
-|-----|-----------|---------------|
-| Vektör DB | ChromaDB | Yerel: `veri/chroma_db` |
-| Embedding Model | all-MiniLM-L6-v2 | HuggingFace, hafif, hızlı (10M model) |
+---
 
-## Paketleme & Dağıtım (Planlanan)
-- Electron (masaüstü .exe uygulama)
-- Docker + docker-compose (taşınabilir deploy)
+## 🤖 Yapay Zekâ Katmanları (Model Hiyerarşisi)
+| Katman | Model | Kullanım Alanı | Gerekçe |
+|---|---|---|---|
+| **Hızlı PDF Analizi** | `gemini-3.5-flash-lite` | Künye, özet ve anahtar kelime çıkarma | Hızlı, ultra düşük token maliyeti |
+| **Ana RAG Motoru** | `gemini-3.5-flash` | Akademik sohbet, kaynakça sentezi, makale taslağı | Yüksek bağlam penceresi, sıfır halüsinasyon |
+| **Derin Zekâ** | `DeepSeek-R1` | Formül açıklama, karmaşık metodoloji analizi | Chain-of-thought (düşünce zinciri) |
+| **Embedding** | `all-MiniLM-L6-v2` / `bge-m3` | Yerel metin vektörizasyonu | CPU üzerinde hızlı ve kararlı |
 
-## Yapılandırma / Path'ler
-| Konum | Kullanım |
-|--------|----------|
-| `requirements.txt` | Python bağımlılıkları |
-| `npm install` | Frontend node_modules kurulumu |
-| `.env` | API anahtarları (gizli) |
+---
 
-## Port & Sunucular
-- Backend: `port 8000` (Uvicorn/FastAPI)
-- Frontend: `port 5173` (Vite dev server)
-- ChromaDB vektör veritabanı: `veri/chroma_db`
+## 🗄️ Veri Depolama & İzolasyon
+| Alan | Teknoloji | Konum | İzolasyon Kuralı |
+|---|---|---|---|
+| **Vektör Veritabanı** | ChromaDB | `veri/chroma_db` | Seçilen sürücüye kilitli, kalıcı sqlite3 tabanlı |
+| **Model Önbelleği** | Hugging Face Cache | `veri/modeller/hf` | `HF_HOME` ortam değişkeniyle kilitli (`C:\` sızıntısı yok) |
+| **PDF Kütüphanesi** | Yerel Dosya Sistemi | `veri/Kutuphane_Gelen`, `veri/Kutuphane_Arsiv` | Ham PDF arşivleme |
+| **Kullanıcı Ayarları** | JSON | `veri/settings.json` | Sürücü ve API tercihleri |
 
+---
+
+## 🛡️ Test ve Güvenlik Altyapısı
+- **Temiz Oda Sanal Test İstasyonu:** `tools/run_sandbox_test.py` (7 Kalite Kapısı).
+- **Devre Kesici (Circuit Breaker):** `tools/circuit_breaker.py` (Maksimum 2 retry, HITL insan müdahalesi).
+- **Uygulama İçi Akış İndiricisi:** `requests.get(stream=True)` + `os.startfile()`.
+- **Hızlı Yükleme Boru Hattı:** `tools/upload_release_fast.py` (GitHub Releases için katı Content-Length akışı).
