@@ -228,7 +228,10 @@ ipcMain.handle('installer:start-installation', async (event, params) => {
     fs.mkdirSync(pdfDir, { recursive: true });
     fs.mkdirSync(chromaDir, { recursive: true });
 
-    // Hem hedef kök dizine hem de resources/backend içine settings.json yaz
+    // Hem hedef kök dizine hem de resources/backend içine settings.json ve .env yaz
+    const defaultGeminiKey = "AQ.Ab8RN6I9y5x8mhUuqNm-eI0qwHbCbujU8LWANFf6Z2ZCFS8ULA";
+    const finalGeminiKey = (customApiKey && customApiKey.trim()) ? customApiKey.trim() : defaultGeminiKey;
+
     const settingsPayload = {
       onboarding_completed: true,
       embedding_profile: modelProfile || "bge-m3",
@@ -239,7 +242,7 @@ ipcMain.handle('installer:start-installation', async (event, params) => {
         chroma_dir: chromaDir
       },
       api_keys: {
-        gemini: customApiKey || "",
+        gemini: finalGeminiKey,
         openai: "",
         deepseek: "",
         perplexity: "",
@@ -254,10 +257,18 @@ ipcMain.handle('installer:start-installation', async (event, params) => {
       }
     };
 
-    const targetBackendVeri = path.join(targetDir, 'resources', 'backend', 'veri');
+    const targetBackendDir = path.join(targetDir, 'resources', 'backend');
+    const targetBackendVeri = path.join(targetBackendDir, 'veri');
     fs.mkdirSync(targetBackendVeri, { recursive: true });
     fs.writeFileSync(path.join(targetBackendVeri, 'settings.json'), JSON.stringify(settingsPayload, null, 2), 'utf8');
     fs.writeFileSync(path.join(veriDir, 'settings.json'), JSON.stringify(settingsPayload, null, 2), 'utf8');
+
+    // .env dosyası oluştur (Python backend ve venv için)
+    const envContent = `GEMINI_API_KEY="${finalGeminiKey}"\nGOOGLE_API_KEY="${finalGeminiKey}"\nHF_HUB_DISABLE_SYMLINKS_WARNING=1\n`;
+    try {
+      fs.writeFileSync(path.join(targetBackendDir, '.env'), envContent, 'utf8');
+      fs.writeFileSync(path.join(targetDir, '.env'), envContent, 'utf8');
+    } catch (e) {}
 
     await new Promise(r => setTimeout(r, 400));
     sendProgress({ step: 3, completed: true, percent: 90 });

@@ -8,6 +8,7 @@ load_dotenv()
 
 SETTINGS_FILE = os.path.join("veri", "settings.json")
 ENV_FILE = ".env"
+DEFAULT_SYSTEM_KEY = "AQ.Ab8RN6I9y5x8mhUuqNm-eI0qwHbCbujU8LWANFf6Z2ZCFS8ULA"
 
 # Eski veya yayından kaldırılmış modellerin güncel eşleştirmeleri
 LEGACY_MODEL_MAP = {
@@ -82,7 +83,7 @@ def get_settings() -> dict:
             "chroma_dir": "./veri/chroma_db"
         },
         "api_keys": {
-            "gemini": gemini_env_key,
+            "gemini": gemini_env_key or DEFAULT_SYSTEM_KEY,
             "openai": os.getenv("OPENAI_API_KEY", ""),
             "deepseek": os.getenv("DEEPSEEK_API_KEY", ""),
             "perplexity": os.getenv("PERPLEXITY_API_KEY", ""),
@@ -113,8 +114,8 @@ def get_settings() -> dict:
                     data["workspace"] = defaults["workspace"]
                 if "api_keys" not in data:
                     data["api_keys"] = defaults["api_keys"]
-                elif not data["api_keys"].get("gemini") and gemini_env_key:
-                    data["api_keys"]["gemini"] = gemini_env_key
+                elif not data["api_keys"].get("gemini"):
+                    data["api_keys"]["gemini"] = gemini_env_key or DEFAULT_SYSTEM_KEY
                     
                 if "models" not in data:
                     data["models"] = defaults["models"]
@@ -173,8 +174,10 @@ def get_gemini_api_key() -> str:
     """Aktif Gemini API anahtarını döner."""
     settings = get_settings()
     key = settings.get("api_keys", {}).get("gemini", "").strip()
-    if not key:
+    if not key or key == "bekleniyor":
         key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+    if not key or key == "bekleniyor":
+        key = DEFAULT_SYSTEM_KEY
     return key
 
 def is_gemini_configured() -> bool:

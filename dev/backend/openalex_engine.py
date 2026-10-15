@@ -24,6 +24,18 @@ def search_articles(query: str, limit: int = 5, page: int = 1, sort_by: str = "r
             authors = [a["author"]["display_name"] for a in work.get("authorships", []) if "author" in a]
             is_oa = work.get("open_access", {}).get("is_oa", False)
             
+            # Doğrudan PDF bağlantısını önce best_oa_location veya primary_location içinden al
+            best_oa = work.get("best_oa_location") or {}
+            primary_loc = work.get("primary_location") or {}
+            oa_obj = work.get("open_access") or {}
+            pdf_url = best_oa.get("pdf_url") or primary_loc.get("pdf_url") or oa_obj.get("oa_url")
+            
+            # ArXiv özel format düzeltmesi (abs -> pdf)
+            if pdf_url and "arxiv.org/abs/" in pdf_url:
+                pdf_url = pdf_url.replace("arxiv.org/abs/", "arxiv.org/pdf/")
+                if not pdf_url.endswith(".pdf"):
+                    pdf_url += ".pdf"
+
             results.append({
                 "id": work.get("id"),
                 "title": work.get("title"),
@@ -31,7 +43,7 @@ def search_articles(query: str, limit: int = 5, page: int = 1, sort_by: str = "r
                 "publication_year": work.get("publication_year"),
                 "authors": authors,
                 "is_oa": is_oa,
-                "open_access_url": work.get("open_access", {}).get("oa_url"),
+                "open_access_url": pdf_url or oa_obj.get("oa_url"),
                 "type": work.get("type", "Belirsiz")
             })
         return results

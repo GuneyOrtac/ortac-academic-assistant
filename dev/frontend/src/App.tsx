@@ -26,9 +26,10 @@ interface Article {
 }
 
 function App() {
+  const isInstallerMode = !!(window as any).electronAPI?.isInstaller;
   const [activeTab, setActiveTab] = useState('home');
-  const [showSetupWizard, setShowSetupWizard] = useState(false);
-  const [isCheckingSetup, setIsCheckingSetup] = useState(true);
+  const [showSetupWizard, setShowSetupWizard] = useState(isInstallerMode);
+  const [isCheckingSetup, setIsCheckingSetup] = useState(!isInstallerMode);
   const [backendConnectionFailed, setBackendConnectionFailed] = useState(false);
   const [appUpdateInfo, setAppUpdateInfo] = useState<any>(null);
   
@@ -110,6 +111,43 @@ function App() {
     }
   };
 
+  const fetchDashboardData = async () => {
+    setIsDashboardLoading(true);
+    try {
+      const mcpRes = await fetch(`${API_URL}/api/mcp-araclar`);
+      if (mcpRes.ok) {
+        const mcpData = await mcpRes.json();
+        setMcpStatus(mcpData);
+      }
+      
+      const oaRes = await fetch(`${API_URL}/api/literatur-tara`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sorgu: "artificial intelligence geospatial analysis earth science", limit: 3, sort_by: "date", min_year: 2024 })
+      });
+      if (oaRes.ok) {
+        const oaData = await oaRes.json();
+        setRecentArticles(oaData.sonuclar || []);
+      }
+    } catch (error) {
+      console.error("Dashboard data load error:", error);
+    } finally {
+      setIsDashboardLoading(false);
+    }
+  };
+
+  const checkGitHubUpdate = async () => {
+    try {
+      const uRes = await fetch(`${API_URL}/api/guncelleme-kontrol`);
+      if (uRes.ok) {
+        const uData = await uRes.json();
+        setAppUpdateInfo(uData);
+      }
+    } catch (e) {
+      console.error("Güncelleme kontrolü yapılamadı:", e);
+    }
+  };
+
   const checkSetupStatus = async (attemptsLeft = 35) => {
     try {
       const sRes = await fetch(`${API_URL}/api/sistem-bilgisi`);
@@ -120,6 +158,8 @@ function App() {
         }
         setIsCheckingSetup(false);
         setBackendConnectionFailed(false);
+        fetchDashboardData();
+        fetchLibraryData();
         return;
       }
     } catch (err) {
@@ -135,42 +175,11 @@ function App() {
   };
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const mcpRes = await fetch(`${API_URL}/api/mcp-araclar`);
-        if (mcpRes.ok) {
-          const mcpData = await mcpRes.json();
-          setMcpStatus(mcpData);
-        }
-        
-        const oaRes = await fetch(`${API_URL}/api/literatur-tara`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sorgu: "artificial intelligence in disaster management", limit: 3, sort_by: "date", min_year: 2026 })
-        });
-        if (oaRes.ok) {
-          const oaData = await oaRes.json();
-          setRecentArticles(oaData.sonuclar || []);
-        }
-      } catch (error) {
-        console.error("Dashboard data load error:", error);
-      } finally {
-        setIsDashboardLoading(false);
-      }
-    };
-
-    const checkGitHubUpdate = async () => {
-      try {
-        const uRes = await fetch(`${API_URL}/api/guncelleme-kontrol`);
-        if (uRes.ok) {
-          const uData = await uRes.json();
-          setAppUpdateInfo(uData);
-        }
-      } catch (e) {
-        console.error("Güncelleme kontrolü yapılamadı:", e);
-      }
-    };
-
+    if (isInstallerMode) {
+      setShowSetupWizard(true);
+      setIsCheckingSetup(false);
+      return;
+    }
     checkSetupStatus();
     checkGitHubUpdate();
     fetchDashboardData();
@@ -247,11 +256,15 @@ function App() {
           });
         }, 2000);
       } else {
+        const errJson = await res.json().catch(() => null);
+        const errMsg = errJson?.detail || "Sunucu PDF'i indiremedi veya doğrudan PDF formatında değil.";
+        alert(`Kütüphaneye Eklenemedi:\n${errMsg}\n\nMakale doğrudan web tarayıcısında açılıyor.`);
         setDownloadingMap(prev => { const next = {...prev}; delete next[id]; return next; });
         window.open(url, '_blank');
       }
-    } catch (e) {
+    } catch (e: any) {
       clearInterval(progressInterval);
+      alert(`Hata: ${e?.message || "Sunucu bağlantısı kurulamadı."}\n\nMakale doğrudan web tarayıcısında açılıyor.`);
       setDownloadingMap(prev => { const next = {...prev}; delete next[id]; return next; });
       window.open(url, '_blank');
     }
@@ -279,6 +292,10 @@ function App() {
       });
       
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Sunucudan geçerli bir yanıt alınamadı.");
+      }
+      
       let sourceInfo = undefined;
       if (data.kullanilan_kaynaklar && data.kullanilan_kaynaklar.length > 0) {
         sourceInfo = data.kullanilan_kaynaklar.map((k: any) => `${k.yazar} (${k.yil})`);
@@ -302,10 +319,10 @@ function App() {
         sender: 'ai',
         sources: sourceInfo
       }]);
-    } catch (error) {
+    } catch (error: any) {
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
-        text: "Hata: Sunucuya ulaşılamadı.",
+        text: `Hata: ${error?.message || "Sunucuya ulaşılamadı."}`,
         sender: 'ai'
       }]);
     } finally {
@@ -552,39 +569,39 @@ function App() {
                   >
                     <SwiperSlide>
                       <div className="slider-item">
-                        <img src="/slider_1.jpg" alt="RAG Teknolojisi" />
+                        <img src="./slider_1.jpg" alt="RAG Teknolojisi" />
                         <div className="slider-overlay">
                           <div className="slider-content-box">
                             <span className="slider-badge">YENİ ÖZELLİK</span>
                             <h2 className="slider-title">RAG Teknolojisi Entegrasyonu!</h2>
                             <p className="slider-desc">Kendi belgelerinizle konuşun. Gelişmiş yapay zeka altyapısı ile makalelerinizi saniyeler içinde analiz edin, literatürünüze tam hakim olun.</p>
-                            <button className="slider-btn">Kütüphaneyi Keşfet <span style={{marginLeft:'4px'}}>→</span></button>
+                            <button className="slider-btn" onClick={() => setActiveTab('library')}>Kütüphaneyi Keşfet <span style={{marginLeft:'4px'}}>→</span></button>
                           </div>
                         </div>
                       </div>
                     </SwiperSlide>
                     <SwiperSlide>
                       <div className="slider-item">
-                        <img src="/slider_2.jpg" alt="Açık Erişim Analizi" />
+                        <img src="./slider_2.jpg" alt="Açık Erişim Analizi" />
                         <div className="slider-overlay">
                           <div className="slider-content-box">
                             <span className="slider-badge" style={{backgroundColor: '#10b981'}}>GÜNCELLEME</span>
                             <h2 className="slider-title">Açık Erişim Literatür Radarı!</h2>
                             <p className="slider-desc">OpenAlex entegrasyonu ile milyonlarca açık erişim makaleyi anında tarayın, PDF'leri tek tıkla doğrudan sisteminize indirin.</p>
-                            <button className="slider-btn">Aramaya Başla <span style={{marginLeft:'4px'}}>→</span></button>
+                            <button className="slider-btn" onClick={() => setActiveTab('radar')}>Aramaya Başla <span style={{marginLeft:'4px'}}>→</span></button>
                           </div>
                         </div>
                       </div>
                     </SwiperSlide>
                     <SwiperSlide>
                       <div className="slider-item">
-                        <img src="/slider_3.jpg" alt="Yapay Zeka Makale Taslağı" />
+                        <img src="./slider_3.jpg" alt="Yapay Zeka Makale Taslağı" />
                         <div className="slider-overlay">
                           <div className="slider-content-box">
                             <span className="slider-badge" style={{backgroundColor: '#8b5cf6'}}>YAKINDA</span>
                             <h2 className="slider-title">OpenDraft AI Motoru!</h2>
                             <p className="slider-desc">Word formatında tam teşekküllü makale taslakları oluşturun. Referanslı, akademik ve biçimlendirilmiş çıktılar parmaklarınızın ucunda.</p>
-                            <button className="slider-btn">Daha Fazla Bilgi <span style={{marginLeft:'4px'}}>→</span></button>
+                            <button className="slider-btn" onClick={() => setActiveTab('draft')}>Daha Fazla Bilgi <span style={{marginLeft:'4px'}}>→</span></button>
                           </div>
                         </div>
                       </div>

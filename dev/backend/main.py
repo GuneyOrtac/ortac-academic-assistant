@@ -257,13 +257,29 @@ async def download_and_add_pdf(request: DownloadPDFRequest):
     
     # 1. URL'den indir
     try:
+        download_url = request.url.strip()
+        if "arxiv.org/abs/" in download_url:
+            download_url = download_url.replace("arxiv.org/abs/", "arxiv.org/pdf/")
+            if not download_url.endswith(".pdf"):
+                download_url += ".pdf"
+
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
         }
-        response = requests.get(request.url, headers=headers, timeout=30.0, allow_redirects=True)
+        response = requests.get(download_url, headers=headers, timeout=30.0, allow_redirects=True)
         response.raise_for_status()
         
-        # İçerik tipini kontrol et (bazen HTML dönebilir)
+        # İçerik tipini kontrol et (HTML döndüyse meta etiketinden PDF linki aramayı dene)
+        content_type = response.headers.get("Content-Type", "")
+        if "application/pdf" not in content_type and not response.content.startswith(b"%PDF"):
+            import re
+            pdf_match = re.search(r'<meta\s+name=["\']citation_pdf_url["\']\s+content=["\']([^"\']+)["\']', response.text, re.IGNORECASE)
+            if pdf_match:
+                alt_url = pdf_match.group(1)
+                alt_resp = requests.get(alt_url, headers=headers, timeout=30.0, allow_redirects=True)
+                if alt_resp.status_code == 200 and (alt_resp.content.startswith(b"%PDF") or "application/pdf" in alt_resp.headers.get("Content-Type", "")):
+                    response = alt_resp
+
         content_type = response.headers.get("Content-Type", "")
         if "application/pdf" not in content_type and not response.content.startswith(b"%PDF"):
             raise ValueError("Bu bağlantı doğrudan bir PDF vermiyor (Erişim sayfası olabilir). Lütfen tarayıcı üzerinden manuel indirip 'Kütüphane' sekmesinden yükleyin.")
@@ -298,9 +314,18 @@ async def download_and_add_pdf(request: DownloadPDFRequest):
             partial_variables={"format_instructions": parser.get_format_instructions()},
         )
         
-        analysis_llm = model_factory.get_gemini_llm(task="analysis")
-        chain = prompt | analysis_llm | parser
-        metadata_sonuc = chain.invoke({"text": ilk_sayfalar_metni})
+        try:
+            analysis_llm = model_factory.get_gemini_llm(task="analysis")
+            chain = prompt | analysis_llm | parser
+            metadata_sonuc = chain.invoke({"text": ilk_sayfalar_metni})
+        except Exception as llm_err:
+            print(f"Otomatik LLM analizi başarısız ({llm_err}), OpenAlex başlığı kullanılıyor.")
+            metadata_sonuc = {
+                "baslik": request.title,
+                "yazar": "Açık Erişim",
+                "yil": "2024",
+                "ozet": ilk_sayfalar_metni[:400].strip() if ilk_sayfalar_metni else "Açık erişim akademik makale."
+            }
         doc.close()
         
         # OpenAlex başlığını fallback olarak ekle
