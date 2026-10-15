@@ -30,11 +30,15 @@ def search_articles(query: str, limit: int = 5, page: int = 1, sort_by: str = "r
             oa_obj = work.get("open_access") or {}
             pdf_url = best_oa.get("pdf_url") or primary_loc.get("pdf_url") or oa_obj.get("oa_url")
             
-            # ArXiv özel format düzeltmesi (abs -> pdf)
-            if pdf_url and "arxiv.org/abs/" in pdf_url:
-                pdf_url = pdf_url.replace("arxiv.org/abs/", "arxiv.org/pdf/")
-                if not pdf_url.endswith(".pdf"):
-                    pdf_url += ".pdf"
+            # Protokol düzeltmesi ve ArXiv özel format düzeltmesi (abs -> pdf)
+            if pdf_url:
+                pdf_url = pdf_url.strip()
+                if pdf_url.startswith("//"):
+                    pdf_url = "https:" + pdf_url
+                if "arxiv.org/abs/" in pdf_url:
+                    pdf_url = pdf_url.replace("arxiv.org/abs/", "arxiv.org/pdf/")
+                    if not pdf_url.endswith(".pdf"):
+                        pdf_url += ".pdf"
 
             results.append({
                 "id": work.get("id"),

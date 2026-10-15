@@ -269,16 +269,31 @@ async def download_and_add_pdf(request: DownloadPDFRequest):
         response = requests.get(download_url, headers=headers, timeout=30.0, allow_redirects=True)
         response.raise_for_status()
         
-        # İçerik tipini kontrol et (HTML döndüyse meta etiketinden PDF linki aramayı dene)
+        # İçerik tipini kontrol et (HTML döndüyse meta etiketinden veya bağlantılardan PDF linki ara)
         content_type = response.headers.get("Content-Type", "")
         if "application/pdf" not in content_type and not response.content.startswith(b"%PDF"):
             import re
-            pdf_match = re.search(r'<meta\s+name=["\']citation_pdf_url["\']\s+content=["\']([^"\']+)["\']', response.text, re.IGNORECASE)
+            from urllib.parse import urljoin
+
+            # 1. <meta name="citation_pdf_url" content="...">
+            pdf_match = re.search(r'<meta\s+[^>]*(?:name|property)=["\']citation_pdf_url["\']\s+content=["\']([^"\']+)["\']', response.text, re.IGNORECASE)
+            if not pdf_match:
+                pdf_match = re.search(r'<meta\s+[^>]*content=["\']([^"\']+)["\']\s+[^>]*(?:name|property)=["\']citation_pdf_url["\']', response.text, re.IGNORECASE)
+
+            # 2. DergiPark / OJS / Genel Akademik PDF indirme buton linkleri
+            if not pdf_match:
+                pdf_match = re.search(r'href=["\']([^"\']*(?:/download/article-file/|/article/download/|\.pdf)(?:[^"\']*)?)["\']', response.text, re.IGNORECASE)
+
             if pdf_match:
-                alt_url = pdf_match.group(1)
-                alt_resp = requests.get(alt_url, headers=headers, timeout=30.0, allow_redirects=True)
-                if alt_resp.status_code == 200 and (alt_resp.content.startswith(b"%PDF") or "application/pdf" in alt_resp.headers.get("Content-Type", "")):
-                    response = alt_resp
+                alt_url = pdf_match.group(1).strip()
+                # Göreceli (relative) URL'leri ana sayfa adresiyle mutlak (absolute) URL'e dönüştür
+                alt_url = urljoin(response.url, alt_url)
+                try:
+                    alt_resp = requests.get(alt_url, headers=headers, timeout=30.0, allow_redirects=True)
+                    if alt_resp.status_code == 200 and (alt_resp.content.startswith(b"%PDF") or "application/pdf" in alt_resp.headers.get("Content-Type", "")):
+                        response = alt_resp
+                except Exception as inner_e:
+                    print(f"Göreceli PDF indirme hatası: {inner_e}")
 
         content_type = response.headers.get("Content-Type", "")
         if "application/pdf" not in content_type and not response.content.startswith(b"%PDF"):
