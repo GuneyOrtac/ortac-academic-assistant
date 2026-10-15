@@ -53,14 +53,14 @@ export default function SettingsTab() {
   };
 
   const handleApplyUpdate = async () => {
-    if (!window.confirm("GitHub'daki en son sürüm çekilerek sistem güncellenecektir. Onaylıyor musunuz?")) return;
+    if (!window.confirm("GitHub'daki en son sürüm kurulum paketi indirilerek sistem güncellenecektir. Onaylıyor musunuz?")) return;
     setUpdating(true);
     setUpdateMsg('');
     try {
       const res = await fetch('http://127.0.0.1:8000/api/guncelleme-uygula', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        setUpdateMsg(data.mesaj || 'Güncelleme başarıyla tamamlandı!');
+        setUpdateMsg(data.mesaj || 'Güncelleme paketi tarayıcınızda açıldı!');
       } else {
         setUpdateMsg(data.detail || 'Güncelleme hatası.');
       }

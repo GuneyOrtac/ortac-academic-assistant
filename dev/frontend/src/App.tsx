@@ -160,6 +160,7 @@ function App() {
         setBackendConnectionFailed(false);
         fetchDashboardData();
         fetchLibraryData();
+        checkGitHubUpdate();
         return;
       }
     } catch (err) {

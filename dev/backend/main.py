@@ -568,39 +568,34 @@ async def check_github_update():
 
 @app.post("/api/guncelleme-uygula")
 async def apply_github_update():
-    """Doğrudan GitHub'dan en güncel kodları çeker veya güncelleme indirmesini başlatır."""
-    import subprocess
+    """GitHub Releases üzerinden en güncel kurulum dosyasının (Setup.exe) indirilmesini başlatır."""
     import webbrowser
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    import requests
     
-    if os.path.exists(os.path.join(project_root, ".git")):
-        try:
-            res = subprocess.run(
-                ["git", "pull", "origin", "main"],
-                cwd=project_root,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            output = (res.stdout or "") + (res.stderr or "")
-            return {
-                "durum": "basarili" if res.returncode == 0 else "hata",
-                "cikti": output,
-                "mesaj": "GitHub üzerinden en son kaynak kodlar başarıyla çekildi!" if res.returncode == 0 else "Güncelleme sırasında hata oluştu."
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Güncelleme uygulanamadı: {str(e)}")
-    else:
-        release_url = f"https://github.com/{GITHUB_REPO}/releases/latest"
-        try:
-            webbrowser.open(release_url)
-        except Exception:
-            pass
-        return {
-            "durum": "basarili",
-            "mesaj": "En yeni sürüm indirme sayfası tarayıcınızda açıldı. Kurulum dosyasını indirip mevcut kurulum dizininize (ör. F:\\AkademikAsistan) kurarak sisteminizi anında güncelleyebilirsiniz.",
-            "url": release_url
-        }
+    download_url = f"https://github.com/{GITHUB_REPO}/releases/latest"
+    try:
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+        headers = {"User-Agent": "AcademicAssistant-Updater"}
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            for asset in data.get("assets", []):
+                if asset.get("name", "").endswith(".exe"):
+                    download_url = asset.get("browser_download_url", download_url)
+                    break
+    except Exception:
+        pass
+
+    try:
+        webbrowser.open(download_url)
+    except Exception:
+        pass
+
+    return {
+        "durum": "basarili",
+        "mesaj": "En yeni sürüm kurulum paketi tarayıcınızda indirilmeye başlandı! İndirilen kurulum dosyasını çalıştırarak verileriniz ve kütüphaneniz korunarak saniyeler içinde güncelleyebilirsiniz.",
+        "url": download_url
+    }
 
 if __name__ == "__main__":
     import uvicorn
