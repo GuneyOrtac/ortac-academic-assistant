@@ -158,6 +158,13 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
       });
       const data = await res.json();
       if (res.ok) {
+        try {
+          if ((window as any).electronAPI?.createShortcut) {
+            (window as any).electronAPI.createShortcut();
+          }
+        } catch (scErr) {
+          console.warn("Kısayol oluşturulamadı:", scErr);
+        }
         onComplete();
       } else {
         setErrorMsg(data.detail || "Kurulum kaydedilirken hata oluştu.");

@@ -2,5 +2,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  checkUpdates: () => ipcRenderer.invoke('app:check-updates')
+  checkUpdates: () => ipcRenderer.invoke('app:check-updates'),
+  createShortcut: () => ipcRenderer.invoke('app:create-shortcut')
 });
