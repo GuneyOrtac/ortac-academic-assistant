@@ -459,7 +459,7 @@ function App() {
       {/* 1. Sol Menü (Sabit) */}
       <div className="sidebar">
         <div className="sidebar-header">
-          <img src="/logo.png" alt="Logo" style={{height: '55px', width: 'auto'}} />
+          <img src="./logo.png" alt="Logo" style={{height: '55px', width: 'auto'}} />
           <span>Akademik Asistan</span>
         </div>
         

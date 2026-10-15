@@ -55,11 +55,19 @@ function startBackend() {
   let args = [];
 
   if (isDev) {
-    const projectRoot = path.resolve(__dirname, '..', '..', '..');
-    backendExe = path.join(projectRoot, 'dev', 'backend', '.venv', 'Scripts', 'python.exe');
-    const backendScript = path.join(projectRoot, 'dev', 'backend', 'main.py');
-    backendCwd = path.join(projectRoot, 'dev', 'backend');
-    args = [backendScript];
+    const localPackagedBackend = path.join(__dirname, '..', 'backend', 'AkademikAsistan_Backend.exe');
+    const projectRoot = path.resolve(__dirname, '..', '..', '..', '..');
+    const devPython = path.join(projectRoot, 'dev', 'backend', '.venv', 'Scripts', 'python.exe');
+
+    if (fs.existsSync(localPackagedBackend)) {
+      backendExe = localPackagedBackend;
+      backendCwd = path.join(__dirname, '..', 'backend');
+      args = [];
+    } else if (fs.existsSync(devPython)) {
+      backendExe = devPython;
+      backendCwd = path.join(projectRoot, 'dev', 'backend');
+      args = [path.join(backendCwd, 'main.py')];
+    }
   } else {
     // Paketlenmiş Electron: Backend extraResources içinde
     backendExe = path.join(process.resourcesPath, 'backend', 'AkademikAsistan_Backend.exe');
@@ -197,4 +205,23 @@ app.on('window-all-closed', () => {
 ipcMain.handle('app:check-updates', async () => {
   const currentVersion = app.getVersion();
   return { currentVersion };
+});
+
+ipcMain.handle('app:create-shortcut', async () => {
+  try {
+    const desktopPath = app.getPath('desktop');
+    const shortcutPath = path.join(desktopPath, 'ORTAC Akademik Asistan.lnk');
+    const iconPath = path.join(__dirname, '..', 'assets', 'icon.ico');
+    shell.writeShortcutLink(shortcutPath, {
+      target: process.execPath,
+      description: 'ORTAC Geo|Science - Akademik Asistan',
+      icon: fs.existsSync(iconPath) ? iconPath : undefined,
+      iconIndex: 0
+    });
+    log(`[ELECTRON] Masaüstü kısayolu oluşturuldu: ${shortcutPath}`);
+    return { success: true };
+  } catch (err) {
+    log(`[ELECTRON] Kısayol oluşturma hatası: ${err.message}`);
+    return { success: false, error: err.message };
+  }
 });

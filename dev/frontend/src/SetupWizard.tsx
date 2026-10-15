@@ -221,7 +221,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
           <img 
-            src="/logo.png" 
+            src="./logo.png" 
             alt="ORTAC GeoScience" 
             style={{ height: '42px', width: 'auto', filter: 'brightness(1.1)' }} 
           />

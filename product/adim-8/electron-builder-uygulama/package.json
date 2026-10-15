@@ -45,15 +45,28 @@
       "icon": "assets/icon.ico",
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "x64"
           ]
         }
       ]
     },
-    "portable": {
-      "artifactName": "Akademik.Asistan.0.0.1.exe"
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ORTAC Akademik Asistan",
+      "runAfterFinish": true,
+      "artifactName": "ORTAC.Akademik.Asistan.Setup.0.0.1.exe"
     }
   }
 }
