@@ -29,6 +29,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
+  const [backendConnectionFailed, setBackendConnectionFailed] = useState(false);
   const [appUpdateInfo, setAppUpdateInfo] = useState<any>(null);
   
   // Chat State
@@ -109,6 +110,30 @@ function App() {
     }
   };
 
+  const checkSetupStatus = async (attemptsLeft = 35) => {
+    try {
+      const sRes = await fetch(`${API_URL}/api/sistem-bilgisi`);
+      if (sRes.ok) {
+        const sData = await sRes.json();
+        if (sData.onboarding_tamamlandi === false) {
+          setShowSetupWizard(true);
+        }
+        setIsCheckingSetup(false);
+        setBackendConnectionFailed(false);
+        return;
+      }
+    } catch (err) {
+      console.warn("Kurulum durumu sorgulanıyor, bekleniyor...", err);
+    }
+    
+    if (attemptsLeft > 0) {
+      setTimeout(() => checkSetupStatus(attemptsLeft - 1), 1000);
+    } else {
+      setIsCheckingSetup(false);
+      setBackendConnectionFailed(true);
+    }
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -131,28 +156,6 @@ function App() {
         console.error("Dashboard data load error:", error);
       } finally {
         setIsDashboardLoading(false);
-      }
-    };
-    
-    const checkSetupStatus = async (attemptsLeft = 25) => {
-      try {
-        const sRes = await fetch(`${API_URL}/api/sistem-bilgisi`);
-        if (sRes.ok) {
-          const sData = await sRes.json();
-          if (sData.onboarding_tamamlandi === false) {
-            setShowSetupWizard(true);
-          }
-          setIsCheckingSetup(false);
-          return;
-        }
-      } catch (err) {
-        console.warn("Kurulum durumu sorgulanıyor, bekleniyor...", err);
-      }
-      
-      if (attemptsLeft > 0) {
-        setTimeout(() => checkSetupStatus(attemptsLeft - 1), 1000);
-      } else {
-        setIsCheckingSetup(false);
       }
     };
 
@@ -357,6 +360,64 @@ function App() {
     }
   };
 
+  if (backendConnectionFailed) {
+    return (
+      <div style={{
+        height: '100vh',
+        width: '100vw',
+        background: '#09090b',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '1.25rem',
+        fontFamily: "'Inter', sans-serif",
+        padding: '2rem',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          background: 'rgba(239, 68, 68, 0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid rgba(239, 68, 68, 0.4)',
+          fontSize: '24px'
+        }}>
+          ⚠️
+        </div>
+        <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 600, margin: 0 }}>
+          Yapay Zekâ Motoruna Bağlanılamadı
+        </h2>
+        <p style={{ color: '#a1a1aa', maxWidth: '480px', fontSize: '13px', lineHeight: 1.6, margin: 0 }}>
+          Yerel backend motoru henüz hazır değil veya Windows Güvenlik Duvarı tarafından engellenmiş olabilir.
+        </p>
+        <button 
+          onClick={() => {
+            setBackendConnectionFailed(false);
+            setIsCheckingSetup(true);
+            checkSetupStatus(35);
+          }}
+          style={{
+            background: '#2563eb',
+            color: '#fff',
+            border: 'none',
+            padding: '10px 24px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            marginTop: '0.5rem'
+          }}
+        >
+          Yeniden Bağlanmayı Dene
+        </button>
+      </div>
+    );
+  }
+
   if (isCheckingSetup) {
     return (
       <div style={{
@@ -371,8 +432,13 @@ function App() {
         color: '#a1a1aa',
         fontFamily: "'Inter', sans-serif"
       }}>
-        <Loader2 size={36} className="animate-spin text-blue-500" />
-        <span style={{ fontSize: '14px' }}>Sistem başlatılıyor...</span>
+        <Loader2 size={40} className="animate-spin text-blue-500" />
+        <span style={{ fontSize: '16px', color: '#f4f4f5', fontWeight: 600, letterSpacing: '-0.02em' }}>
+          ORTAC Akademik Asistan Başlatılıyor...
+        </span>
+        <span style={{ fontSize: '12px', color: '#71717a' }}>
+          Yerel yapay zekâ motoru ve donanım bileşenleri hazırlanıyor
+        </span>
       </div>
     );
   }

@@ -2,13 +2,52 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
+const fs = require('fs');
+
+// --- 1. Tek Örnek Kilidi (Single Instance Lock) ---
+// Kullanıcı kısayola art arda tıkladığında birden fazla kopya ve port çakışmasını engeller
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  process.exit(0);
+}
 
 let mainWindow = null;
 let backendProcess = null;
 const BACKEND_PORT = 8000;
 const FRONTEND_DEV_URL = 'http://localhost:5173';
 
-// 1. Python Backend Sürecini Başlatma
+// --- 2. Günlükleme (Logging) ---
+function getLogPath() {
+  try {
+    const logDir = path.join(app.getPath('userData'), 'logs');
+    fs.mkdirSync(logDir, { recursive: true });
+    return path.join(logDir, 'app.log');
+  } catch (e) {
+    return null;
+  }
+}
+
+function log(msg) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  console.log(msg);
+  const logFile = getLogPath();
+  if (logFile) {
+    try {
+      fs.appendFileSync(logFile, line, 'utf8');
+    } catch (e) {}
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  log(`[UNCAUGHT EXCEPTION]: ${err.stack || err}`);
+});
+
+process.on('unhandledRejection', (reason) => {
+  log(`[UNHANDLED REJECTION]: ${reason}`);
+});
+
+// --- 3. Python Backend Sürecini Başlatma ---
 function startBackend() {
   const isDev = !app.isPackaged;
   let backendExe = '';
@@ -22,59 +61,54 @@ function startBackend() {
     backendCwd = path.join(projectRoot, 'dev', 'backend');
     args = [backendScript];
   } else {
-    // Packaged Electron app: backend executable in extraResources
+    // Paketlenmiş Electron: Backend extraResources içinde
     backendExe = path.join(process.resourcesPath, 'backend', 'AkademikAsistan_Backend.exe');
     backendCwd = path.join(process.resourcesPath, 'backend');
     args = [];
   }
 
-  console.log('[ELECTRON] Backend başlatılıyor:', backendExe, args);
+  log(`[ELECTRON] Backend başlatılıyor: ${backendExe}`);
+
+  if (!fs.existsSync(backendExe)) {
+    log(`[ELECTRON HATA] Backend yürütülebilir dosyası bulunamadı: ${backendExe}`);
+    return;
+  }
 
   try {
     backendProcess = spawn(backendExe, args, {
       cwd: backendCwd,
       detached: false,
-      stdio: 'pipe'
+      stdio: 'pipe',
+      windowsHide: true
     });
 
     backendProcess.stdout.on('data', (data) => {
-      console.log(`[BACKEND STDOUT]: ${data}`);
+      const msg = data.toString().trim();
+      if (msg) log(`[BACKEND STDOUT]: ${msg}`);
     });
 
     backendProcess.stderr.on('data', (data) => {
-      console.error(`[BACKEND STDERR]: ${data}`);
+      const msg = data.toString().trim();
+      if (msg) log(`[BACKEND STDERR]: ${msg}`);
     });
 
     backendProcess.on('close', (code) => {
-      console.log(`[BACKEND EXIT]: Kod ${code}`);
+      log(`[BACKEND EXIT]: Süreç kod ${code} ile kapandı.`);
+      backendProcess = null;
+    });
+
+    backendProcess.on('error', (err) => {
+      log(`[BACKEND ERROR]: Süreç başlatılamadı: ${err.message}`);
     });
   } catch (err) {
-    console.error('[ELECTRON] Backend başlatılamadı:', err);
+    log(`[ELECTRON] Backend spawn hatası: ${err.message}`);
   }
 }
 
-// 2. Backend'in Hazır Olduğunu Kontrol Etme (Polling)
-function waitForBackend(callback, retries = 45) {
-  if (retries <= 0) {
-    console.warn('[ELECTRON] Backend zaman aşımına uğradı, yine de pencere açılıyor.');
-    callback();
-    return;
-  }
-
-  http.get(`http://127.0.0.1:${BACKEND_PORT}/api/sistem-bilgisi`, (res) => {
-    if (res.statusCode === 200) {
-      console.log('[ELECTRON] Backend başarıyla yanıt verdi.');
-      callback();
-    } else {
-      setTimeout(() => waitForBackend(callback, retries - 1), 1000);
-    }
-  }).on('error', () => {
-    setTimeout(() => waitForBackend(callback, retries - 1), 1000);
-  });
-}
-
-// 3. Ana Pencereyi Oluşturma
+// --- 4. Ana Pencereyi Oluşturma (ANINDA AÇILIR) ---
 function createMainWindow() {
+  if (mainWindow) return;
+
   const isDev = !app.isPackaged;
   const iconPath = isDev
     ? path.join(__dirname, '..', '..', '..', 'Logo', 'icon.ico')
@@ -87,14 +121,20 @@ function createMainWindow() {
     minHeight: 700,
     backgroundColor: '#09090b',
     title: 'ORTAC Geo|Science - Akademik Asistan v0.0.1',
-    icon: iconPath,
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     frame: true,
+    show: false, // İlk render tamamlanınca gösterilecek
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true
     }
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    log('[ELECTRON] Ana pencere ekrana verildi.');
   });
 
   const distIndex = path.join(__dirname, '..', 'dist', 'index.html');
@@ -114,12 +154,20 @@ function createMainWindow() {
   });
 }
 
-// 4. Uygulama Yaşam Döngüsü (Lifecycle)
+// --- 5. İkinci Örnek Tetiklendiğinde Pencereye Odaklan ---
+app.on('second-instance', () => {
+  log('[ELECTRON] İkinci bir kopya çalıştırılmak istendi, mevcut pencere öne alınıyor.');
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
+// --- 6. Uygulama Yaşam Döngüsü ---
 app.whenReady().then(() => {
+  log('[ELECTRON] Uygulama hazır, pencere ve backend başlatılıyor...');
+  createMainWindow();
   startBackend();
-  waitForBackend(() => {
-    createMainWindow();
-  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
@@ -127,9 +175,8 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  // Backend sürecini güvenle sonlandır
+  log('[ELECTRON] Tüm pencereler kapatıldı, backend sonlandırılıyor...');
   if (backendProcess && backendProcess.pid) {
-    console.log('[ELECTRON] Backend süreci sonlandırılıyor...');
     try {
       if (process.platform === 'win32') {
         spawn('taskkill', ['/pid', backendProcess.pid, '/f', '/t']);
@@ -137,7 +184,7 @@ app.on('window-all-closed', () => {
         backendProcess.kill();
       }
     } catch (e) {
-      console.error('[ELECTRON] Backend sonlandırma hatası:', e);
+      log(`[ELECTRON] Backend sonlandırma hatası: ${e.message}`);
     }
   }
 
@@ -146,7 +193,7 @@ app.on('window-all-closed', () => {
   }
 });
 
-// IPC: GitHub Güncelleme Kontrolü
+// --- 7. IPC Kanalları ---
 ipcMain.handle('app:check-updates', async () => {
   const currentVersion = app.getVersion();
   return { currentVersion };
