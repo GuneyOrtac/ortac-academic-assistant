@@ -40,7 +40,7 @@ export default function SettingsTab() {
     setCheckingUpdate(true);
     setUpdateMsg('');
     try {
-      const res = await fetch('http://localhost:8000/api/guncelleme-kontrol');
+      const res = await fetch('http://127.0.0.1:8000/api/guncelleme-kontrol');
       if (res.ok) {
         const data = await res.json();
         setUpdateStatus(data);
@@ -57,7 +57,7 @@ export default function SettingsTab() {
     setUpdating(true);
     setUpdateMsg('');
     try {
-      const res = await fetch('http://localhost:8000/api/guncelleme-uygula', { method: 'POST' });
+      const res = await fetch('http://127.0.0.1:8000/api/guncelleme-uygula', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         setUpdateMsg(data.mesaj || 'Güncelleme başarıyla tamamlandı!');
@@ -72,7 +72,7 @@ export default function SettingsTab() {
   };
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/ayarlar')
+    fetch('http://127.0.0.1:8000/api/ayarlar')
       .then(res => res.json())
       .then(data => {
         // Migration if missing
@@ -106,7 +106,7 @@ export default function SettingsTab() {
     setSaving(true);
     setMessage('');
     try {
-      const res = await fetch('http://localhost:8000/api/ayarlar', {
+      const res = await fetch('http://127.0.0.1:8000/api/ayarlar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
@@ -307,7 +307,7 @@ export default function SettingsTab() {
             onClick={async () => {
               if (window.confirm("Kurulum sihirbazını yeniden başlatmak istiyor musunuz? Mevcut ayarlarınız sihirbaz ekranına yüklenecektir.")) {
                 try {
-                  await fetch('http://localhost:8000/api/kurulum-sifirla', { method: 'POST' });
+                  await fetch('http://127.0.0.1:8000/api/kurulum-sifirla', { method: 'POST' });
                   window.location.reload();
                 } catch (e) {
                   alert("Hata oluştu.");

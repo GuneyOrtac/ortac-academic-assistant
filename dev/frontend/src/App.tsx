@@ -94,7 +94,7 @@ function App() {
     }
   }), []);
 
-  const API_URL = "http://localhost:8000";
+  const API_URL = "http://127.0.0.1:8000";
 
   // Fetch Dashboard Data
   const fetchLibraryData = async () => {
@@ -134,7 +134,7 @@ function App() {
       }
     };
     
-    const checkSetupStatus = async () => {
+    const checkSetupStatus = async (attemptsLeft = 25) => {
       try {
         const sRes = await fetch(`${API_URL}/api/sistem-bilgisi`);
         if (sRes.ok) {
@@ -142,10 +142,16 @@ function App() {
           if (sData.onboarding_tamamlandi === false) {
             setShowSetupWizard(true);
           }
+          setIsCheckingSetup(false);
+          return;
         }
       } catch (err) {
-        console.error("Kurulum durumu alınamadı:", err);
-      } finally {
+        console.warn("Kurulum durumu sorgulanıyor, bekleniyor...", err);
+      }
+      
+      if (attemptsLeft > 0) {
+        setTimeout(() => checkSetupStatus(attemptsLeft - 1), 1000);
+      } else {
         setIsCheckingSetup(false);
       }
     };
