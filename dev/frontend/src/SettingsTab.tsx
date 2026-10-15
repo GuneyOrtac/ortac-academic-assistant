@@ -10,6 +10,10 @@ interface ModelTaskConfig {
 interface SettingsData {
   api_keys: Record<string, string>;
   models: Record<string, ModelTaskConfig>;
+  workspace?: Record<string, string>;
+  embedding_profile?: string;
+  api_mode?: string;
+  onboarding_completed?: boolean;
 }
 
 const providers = ['gemini', 'openai', 'deepseek', 'perplexity', 'anthropic', 'groq', 'nvidia'];
@@ -35,6 +39,22 @@ export default function SettingsTab() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [updateMsg, setUpdateMsg] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+
+  const handleSyncLibrary = async () => {
+    setSyncing(true);
+    setSyncMsg('');
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/kutuphane-senkronize', { method: 'POST' });
+      const data = await res.json();
+      setSyncMsg(data.mesaj || 'Kütüphane senkronizasyonu tamamlandı.');
+    } catch (e: any) {
+      setSyncMsg('Senkronizasyon hatası: ' + e.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleCheckUpdate = async () => {
     setCheckingUpdate(true);
@@ -292,44 +312,95 @@ export default function SettingsTab() {
           </div>
         </div>
 
-        {/* Sistem ve Donanım Kurulum Sihirbazı */}
-        <div style={{ backgroundColor: 'var(--bg-color)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-color)', gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-          <div>
-            <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <HardDrive size={16} style={{ color: 'var(--accent-color)' }} />
-              Kurulum Sihirbazı ve Depolama Yönetimi
-            </h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Vektörleme modeli profilini (BGE-M3 / E5 / Qwen2 / Bulut), kütüphane saklama dizinini veya API sağlayıcısını değiştirmek için sihirbazı yeniden başlatın.
-            </p>
+        {/* Sistem ve Donanım Kurulum Sihirbazı & RAG Yönetimi */}
+        <div style={{ backgroundColor: 'var(--bg-color)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-color)', gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <HardDrive size={16} style={{ color: 'var(--accent-color)' }} />
+                Kurulum Dizini & Vektör Veritabanı (RAG) Yönetimi
+              </h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Seçtiğiniz sürücüdeki aktif veri klasörleri, ChromaDB vektör konumu ve yerel yapay zekâ model dizini.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={handleSyncLibrary}
+                disabled={syncing}
+                style={{
+                  backgroundColor: '#27272a',
+                  color: '#f4f4f5',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                ChromaDB Senkronize Et
+              </button>
+              <button
+                onClick={async () => {
+                  if (window.confirm("Kurulum sihirbazını yeniden başlatmak istiyor musunuz? Mevcut ayarlarınız sihirbaz ekranına yüklenecektir.")) {
+                    try {
+                      await fetch('http://127.0.0.1:8000/api/kurulum-sifirla', { method: 'POST' });
+                      window.location.reload();
+                    } catch (e) {
+                      alert("Hata oluştu.");
+                    }
+                  }
+                }}
+                style={{
+                  backgroundColor: '#27272a',
+                  color: '#f4f4f5',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <RefreshCw size={14} /> Sihirbazı Başlat
+              </button>
+            </div>
           </div>
-          <button
-            onClick={async () => {
-              if (window.confirm("Kurulum sihirbazını yeniden başlatmak istiyor musunuz? Mevcut ayarlarınız sihirbaz ekranına yüklenecektir.")) {
-                try {
-                  await fetch('http://127.0.0.1:8000/api/kurulum-sifirla', { method: 'POST' });
-                  window.location.reload();
-                } catch (e) {
-                  alert("Hata oluştu.");
-                }
-              }
-            }}
-            style={{
-              backgroundColor: '#27272a',
-              color: '#f4f4f5',
-              border: '1px solid rgba(255,255,255,0.15)',
-              padding: '10px 18px',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <RefreshCw size={14} /> Kurulum Sihirbazını Yeniden Başlat
-          </button>
+
+          {syncMsg && (
+            <div style={{ padding: '10px 14px', borderRadius: '6px', backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: '13px' }}>
+              {syncMsg}
+            </div>
+          )}
+
+          {settings.workspace && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block' }}>📁 Ana Depolama Yolu:</span>
+                <span style={{ color: '#e4e4e7', fontFamily: 'monospace' }}>{settings.workspace.storage_path}</span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block' }}>🧠 ChromaDB Vektör Veritabanı:</span>
+                <span style={{ color: '#3b82f6', fontFamily: 'monospace' }}>{settings.workspace.chroma_dir}</span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block' }}>📚 PDF Kütüphanesi:</span>
+                <span style={{ color: '#e4e4e7', fontFamily: 'monospace' }}>{settings.workspace.pdf_dir}</span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block' }}>🤖 Yerel Model Önbelleği (HF):</span>
+                <span style={{ color: '#10b981', fontFamily: 'monospace' }}>{settings.workspace.models_dir || (settings.workspace.storage_path + '\\modeller')}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* GitHub Otomatik Güncelleme ve Sürüm Kontrolü */}

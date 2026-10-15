@@ -82,9 +82,31 @@ function startBackend() {
     return;
   }
 
+  const appRoot = isDev ? path.resolve(__dirname, '..', '..', '..', '..') : path.dirname(process.resourcesPath);
+  const veriDir = path.join(appRoot, 'veri');
+  const modelsDir = path.join(veriDir, 'modeller', 'hf');
+  const torchDir = path.join(veriDir, 'modeller', 'torch');
+
+  try {
+    fs.mkdirSync(path.join(veriDir, 'pdf_kutuphanesi'), { recursive: true });
+    fs.mkdirSync(path.join(veriDir, 'chroma_db'), { recursive: true });
+    fs.mkdirSync(modelsDir, { recursive: true });
+    fs.mkdirSync(torchDir, { recursive: true });
+  } catch (e) {}
+
+  const backendEnv = Object.assign({}, process.env, {
+    AKADEMIK_ASISTAN_ROOT: appRoot,
+    AKADEMIK_ASISTAN_DATA: veriDir,
+    HF_HOME: modelsDir,
+    TRANSFORMERS_CACHE: modelsDir,
+    TORCH_HOME: torchDir,
+    HF_HUB_DISABLE_SYMLINKS_WARNING: '1'
+  });
+
   try {
     backendProcess = spawn(backendExe, args, {
       cwd: backendCwd,
+      env: backendEnv,
       detached: false,
       stdio: 'pipe',
       windowsHide: true
@@ -128,7 +150,7 @@ function createMainWindow() {
     minWidth: 1024,
     minHeight: 700,
     backgroundColor: '#09090b',
-    title: 'ORTAC Geo|Science - Akademik Asistan v0.0.1',
+    title: `ORTAC Geo|Science - Akademik Asistan v${app.getVersion()}`,
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     frame: true,
     show: false, // İlk render tamamlanınca gösterilecek

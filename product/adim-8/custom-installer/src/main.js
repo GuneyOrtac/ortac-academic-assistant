@@ -225,8 +225,14 @@ ipcMain.handle('installer:start-installation', async (event, params) => {
     const veriDir = path.join(targetDir, 'veri');
     const pdfDir = path.join(veriDir, 'pdf_kutuphanesi');
     const chromaDir = path.join(veriDir, 'chroma_db');
+    const modelsDir = path.join(veriDir, 'modeller');
+    const hfDir = path.join(modelsDir, 'hf');
+    const torchDir = path.join(modelsDir, 'torch');
     fs.mkdirSync(pdfDir, { recursive: true });
     fs.mkdirSync(chromaDir, { recursive: true });
+    fs.mkdirSync(modelsDir, { recursive: true });
+    fs.mkdirSync(hfDir, { recursive: true });
+    fs.mkdirSync(torchDir, { recursive: true });
 
     // Hem hedef kök dizine hem de resources/backend içine settings.json ve .env yaz
     const defaultGeminiKey = "AQ.Ab8RN6I9y5x8mhUuqNm-eI0qwHbCbujU8LWANFf6Z2ZCFS8ULA";
@@ -239,7 +245,8 @@ ipcMain.handle('installer:start-installation', async (event, params) => {
       workspace: {
         storage_path: veriDir,
         pdf_dir: pdfDir,
-        chroma_dir: chromaDir
+        chroma_dir: chromaDir,
+        models_dir: modelsDir
       },
       api_keys: {
         gemini: finalGeminiKey,
@@ -251,9 +258,9 @@ ipcMain.handle('installer:start-installation', async (event, params) => {
         nvidia: ""
       },
       models: {
-        chat: { label: "Genel Sohbet & RAG", provider: "gemini", model: "gemini-3.8-flash" },
-        drafting: { label: "Makale Taslağı (OpenDraft)", provider: "gemini", model: "gemini-3.8-flash" },
-        vision: { label: "PDF & Doküman Analizi", provider: "gemini", model: "gemini-3.1-flash-lite" }
+        chat: { label: "Genel Sohbet & RAG", provider: "gemini", model: "gemini-3.5-flash" },
+        drafting: { label: "Makale Taslağı (OpenDraft)", provider: "gemini", model: "gemini-3.5-flash" },
+        vision: { label: "PDF & Doküman Analizi", provider: "gemini", model: "gemini-3.5-flash-lite" }
       }
     };
 
@@ -264,7 +271,7 @@ ipcMain.handle('installer:start-installation', async (event, params) => {
     fs.writeFileSync(path.join(veriDir, 'settings.json'), JSON.stringify(settingsPayload, null, 2), 'utf8');
 
     // .env dosyası oluştur (Python backend ve venv için)
-    const envContent = `GEMINI_API_KEY="${finalGeminiKey}"\nGOOGLE_API_KEY="${finalGeminiKey}"\nHF_HUB_DISABLE_SYMLINKS_WARNING=1\n`;
+    const envContent = `GEMINI_API_KEY="${finalGeminiKey}"\nGOOGLE_API_KEY="${finalGeminiKey}"\nAKADEMIK_ASISTAN_ROOT="${targetDir}"\nAKADEMIK_ASISTAN_DATA="${veriDir}"\nHF_HOME="${hfDir}"\nTRANSFORMERS_CACHE="${hfDir}"\nTORCH_HOME="${torchDir}"\nHF_HUB_DISABLE_SYMLINKS_WARNING=1\n`;
     try {
       fs.writeFileSync(path.join(targetBackendDir, '.env'), envContent, 'utf8');
       fs.writeFileSync(path.join(targetDir, '.env'), envContent, 'utf8');
@@ -314,10 +321,21 @@ ipcMain.handle('installer:start-installation', async (event, params) => {
 ipcMain.handle('installer:launch-app', async (event, targetExe) => {
   if (fs.existsSync(targetExe)) {
     const targetDir = path.dirname(targetExe);
+    const veriDir = path.join(targetDir, 'veri');
+    const modelsDir = path.join(veriDir, 'modeller', 'hf');
+    const torchDir = path.join(veriDir, 'modeller', 'torch');
     spawn(targetExe, [], {
       cwd: targetDir,
       detached: true,
-      stdio: 'ignore'
+      stdio: 'ignore',
+      env: Object.assign({}, process.env, {
+        AKADEMIK_ASISTAN_ROOT: targetDir,
+        AKADEMIK_ASISTAN_DATA: veriDir,
+        HF_HOME: modelsDir,
+        TRANSFORMERS_CACHE: modelsDir,
+        TORCH_HOME: torchDir,
+        HF_HUB_DISABLE_SYMLINKS_WARNING: '1'
+      })
     }).unref();
   }
   app.quit();

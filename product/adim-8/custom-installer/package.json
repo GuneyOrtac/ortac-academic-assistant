@@ -1,6 +1,6 @@
 {
   "name": "ortac-akademik-asistan-kurulum",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "ORTAC Geo|Science - Akademik Asistan Kurulum Sihirbazı",
   "main": "src/main.js",
   "scripts": {
@@ -46,7 +46,7 @@
       ]
     },
     "portable": {
-      "artifactName": "ORTAC.Akademik.Asistan.Setup.0.0.2.exe"
+      "artifactName": "ORTAC.Akademik.Asistan.Setup.0.0.3.exe"
     }
   }
 }

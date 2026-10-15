@@ -6,15 +6,18 @@ import re
 import model_factory
 
 def get_library_dir():
-    """Kütüphane dizinini ayarlar dosyasından dinamik olarak getirir."""
+    """Kütüphane dizinini ayarlar dosyasından veya aktif veri klasöründen dinamik olarak getirir."""
     try:
         settings = model_factory.get_settings()
         pdf_dir = settings.get("workspace", {}).get("pdf_dir")
-        if pdf_dir:
+        if pdf_dir and os.path.isabs(pdf_dir):
+            os.makedirs(pdf_dir, exist_ok=True)
             return pdf_dir
     except Exception:
         pass
-    return os.path.join("veri", "pdf_kutuphanesi")
+    d = os.path.join(model_factory.get_data_dir(), "pdf_kutuphanesi")
+    os.makedirs(d, exist_ok=True)
+    return d
 
 def get_library_db():
     """Kütüphane JSON veritabanı dosyasının tam yolunu döner."""

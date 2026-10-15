@@ -1,4 +1,13 @@
 import os
+import ssl
+import urllib3
+
+try:
+    ssl._create_default_https_context = ssl._create_unverified_context
+except Exception:
+    pass
+urllib3.disable_warnings()
+
 import pymupdf as fitz
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -18,21 +27,23 @@ def reset_rag_engine():
     _vectorstore = None
 
 def get_chroma_dir():
-    """ChromaDB veritabanı dizinini ayarlardan dinamik alır."""
+    """ChromaDB veritabanı dizinini ayarlardan veya aktif veri klasöründen dinamik alır."""
     try:
         settings = model_factory.get_settings()
         chroma_dir = settings.get("workspace", {}).get("chroma_dir")
-        if chroma_dir:
+        if chroma_dir and os.path.isabs(chroma_dir):
+            os.makedirs(chroma_dir, exist_ok=True)
             return chroma_dir
     except Exception:
         pass
-    return os.path.join("veri", "chroma_db")
+    d = os.path.join(model_factory.get_data_dir(), "chroma_db")
+    os.makedirs(d, exist_ok=True)
+    return d
 
 def get_embeddings():
-    """Seçili modele göre embedding nesnesini döner (Singleton)."""
+    """Seçili modele göre embedding nesnesini döner (Singleton). Modeller doğrudan hedef sürücüye indirilir."""
     global _embeddings
     if _embeddings is None:
-        os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
         settings = model_factory.get_settings()
         profile_key = settings.get("embedding_profile", "bge-m3")
         profile_info = model_factory.EMBEDDING_PROFILES.get(profile_key, model_factory.EMBEDDING_PROFILES["bge-m3"])
@@ -47,14 +58,25 @@ def get_embeddings():
             )
         else:
             model_name = profile_info["hf_model"]
+            # Modellerin indirileceği ve aranacağı yerel klasör (F:\AkademikAsistan\veri\modeller\hf)
+            hf_cache_dir = os.path.join(model_factory.get_data_dir(), "modeller", "hf")
+            os.makedirs(hf_cache_dir, exist_ok=True)
+            os.environ["HF_HOME"] = hf_cache_dir
+            os.environ["TRANSFORMERS_CACHE"] = hf_cache_dir
+            os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+            
             try:
+                # Önce çevrimdışı / önceden inmiş yerel kopyayı dene
                 _embeddings = HuggingFaceEmbeddings(
                     model_name=model_name,
+                    cache_folder=hf_cache_dir,
                     model_kwargs={"local_files_only": True}
                 )
             except Exception:
+                # İndirilmemişse hedef sürücüdeki klasöre indir
                 _embeddings = HuggingFaceEmbeddings(
-                    model_name=model_name
+                    model_name=model_name,
+                    cache_folder=hf_cache_dir
                 )
     return _embeddings
 

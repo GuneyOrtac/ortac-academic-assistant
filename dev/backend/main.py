@@ -20,7 +20,7 @@ load_dotenv()
 app = FastAPI(
     title="Akademik Asistan API",
     description="Yapay Zeka Destekli Masaüstü Akademik Asistan Backend Motoru",
-    version="0.0.1"
+    version="0.0.3"
 )
 
 app.add_middleware(
@@ -69,10 +69,7 @@ async def check_system():
 
 @app.post("/api/pdf-yukle")
 async def upload_pdf(file: UploadFile = File(...)):
-    """PDF'i okur, Gemini ile analiz edip künyesini/özetini çıkarır ve vektör veritabanına kaydeder."""
-    if not model_factory.is_gemini_configured():
-        raise HTTPException(status_code=500, detail="Google Gemini API Anahtarı eksik! Lütfen Ayarlar sekmesinden API anahtarınızı kaydedin.")
-
+    """PDF'i okur, analiz edip künyesini çıkarır ve ChromaDB vektör veritabanına kaydeder."""
     # 1. Dosyayı geçici olarak kaydet
     temp_path = f"temp_{file.filename}"
     content = await file.read()
@@ -86,33 +83,45 @@ async def upload_pdf(file: UploadFile = File(...)):
         for page_num in range(min(3, len(doc))):
             ilk_sayfalar_metni += doc[page_num].get_text()
             
-        # 3. Gemini'ye verilecek komut (Prompt)
-        prompt = PromptTemplate(
-            template="""Aşağıdaki akademik belgenin ilk sayfalarından alınan karmaşık metni incele.
-            Bu metinden yola çıkarak eserin künyesini ve özetini istenen JSON formatında çıkar.
-            Eğer metin İngilizce veya başka bir dilde ise, özet ve başlıkları MUTLAKA Türkçe'ye çevirerek yaz.
-            
-            METİN:
-            {text}
-            
-            FORMAT KURALLARI:
-            {format_instructions}""",
-            input_variables=["text"],
-            partial_variables={"format_instructions": parser.get_format_instructions()},
-        )
-        
-        # 4. Zinciri kur ve çalıştır
-        analysis_llm = model_factory.get_gemini_llm(task="analysis")
-        chain = prompt | analysis_llm | parser
-        metadata_sonuc = chain.invoke({"text": ilk_sayfalar_metni})
-        
+        # 3. Gemini ile Künye Çıkarma (Hata durumunda akıllı fallback)
+        metadata_sonuc = None
+        if model_factory.is_gemini_configured():
+            try:
+                prompt = PromptTemplate(
+                    template="""Aşağıdaki akademik belgenin ilk sayfalarından alınan karmaşık metni incele.
+                    Bu metinden yola çıkarak eserin künyesini ve özetini istenen JSON formatında çıkar.
+                    Eğer metin İngilizce veya başka bir dilde ise, özet ve başlıkları MUTLAKA Türkçe'ye çevirerek yaz.
+                    
+                    METİN:
+                    {text}
+                    
+                    FORMAT KURALLARI:
+                    {format_instructions}""",
+                    input_variables=["text"],
+                    partial_variables={"format_instructions": parser.get_format_instructions()},
+                )
+                analysis_llm = model_factory.get_gemini_llm(task="analysis")
+                chain = prompt | analysis_llm | parser
+                metadata_sonuc = chain.invoke({"text": ilk_sayfalar_metni})
+            except Exception as llm_err:
+                print(f"Yapay zekâ künye analizi uyarısı ({llm_err}), yerel fallback künye kullanılıyor.")
+
+        if not metadata_sonuc or not isinstance(metadata_sonuc, dict):
+            clean_title = os.path.splitext(file.filename)[0].replace("_", " ").title()
+            metadata_sonuc = {
+                "baslik": clean_title,
+                "yazar": "Kullanıcı Yüklemesi",
+                "yil": "2024",
+                "ozet": ilk_sayfalar_metni[:400].strip() if ilk_sayfalar_metni else "Akademik belge."
+            }
+
         doc.close()
         
-        # 5. Kütüphaneye Kaydet (İsimlendirip klasöre atar ve library.json'a yazar)
+        # 4. Kütüphaneye Kaydet (İsimlendirip klasöre atar ve library.json'a yazar)
         import library_manager
         kutuphane_kaydi = library_manager.add_to_library(temp_path, metadata_sonuc)
         
-        # 6. RAG Entegrasyonu: Tüm PDF'i ChromaDB'ye vektörleştirerek kaydet
+        # 5. RAG Entegrasyonu: Tüm PDF'i ChromaDB'ye vektörleştirerek kaydet
         chunk_sayisi = rag.pdf_vektorlestir_ve_kaydet(
             pdf_yolu=kutuphane_kaydi["tam_yol"],
             dosya_adi=kutuphane_kaydi["dosya_adi"],
@@ -486,12 +495,18 @@ async def complete_onboarding(request: OnboardingRequest):
     except Exception as e:
         print(f"Disk kontrolünde uyarı: {e}")
 
-    # 2. Dizinleri oluştur
+    # 2. Dizinleri oluştur (Kütüphane, ChromaDB ve Yerel Model Dizini)
     pdf_dir = os.path.join(clean_path, "pdf_kutuphanesi")
     chroma_dir = os.path.join(clean_path, "chroma_db")
+    models_dir = os.path.join(clean_path, "modeller")
+    hf_dir = os.path.join(models_dir, "hf")
+    torch_dir = os.path.join(models_dir, "torch")
     try:
         os.makedirs(pdf_dir, exist_ok=True)
         os.makedirs(chroma_dir, exist_ok=True)
+        os.makedirs(models_dir, exist_ok=True)
+        os.makedirs(hf_dir, exist_ok=True)
+        os.makedirs(torch_dir, exist_ok=True)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Dizin oluşturulamadı: {str(e)}")
 
@@ -503,7 +518,8 @@ async def complete_onboarding(request: OnboardingRequest):
     settings["workspace"] = {
         "storage_path": clean_path,
         "pdf_dir": pdf_dir,
-        "chroma_dir": chroma_dir
+        "chroma_dir": chroma_dir,
+        "models_dir": models_dir
     }
 
     if request.api_mode == "custom_key" and request.custom_api_key.strip():
@@ -518,6 +534,58 @@ async def complete_onboarding(request: OnboardingRequest):
         "ayarlar": settings
     }
 
+@app.post("/api/kutuphane-senkronize")
+async def sync_library_with_rag():
+    """
+    Kütüphanede (pdf_kutuphanesi) kayıtlı olan fakat ChromaDB'de henüz indekslenmemiş
+    makaleleri tarar ve ChromaDB'ye otomatik indeksler.
+    """
+    import library_manager
+    library = library_manager.load_library()
+    if not library:
+        return {"durum": "bilgi", "mesaj": "Kütüphanede kayıtlı makale bulunmuyor.", "indekslenen": 0}
+
+    vs = rag.get_vectorstore()
+    indekslenen_sayisi = 0
+    hatalar = []
+
+    for item in library:
+        pdf_yol = item.get("tam_yol", "")
+        dosya_adi = item.get("dosya_adi", "")
+        if not os.path.exists(pdf_yol):
+            alt_yol = os.path.join(library_manager.get_library_dir(), dosya_adi)
+            if os.path.exists(alt_yol):
+                pdf_yol = alt_yol
+                item["tam_yol"] = alt_yol
+
+        if not os.path.exists(pdf_yol):
+            continue
+
+        try:
+            mevcut = vs.get(where={"dosya_adi": dosya_adi})
+            if mevcut and mevcut.get("ids") and len(mevcut["ids"]) > 0:
+                continue
+        except Exception:
+            pass
+
+        try:
+            rag.pdf_vektorlestir_ve_kaydet(
+                pdf_yolu=pdf_yol,
+                dosya_adi=dosya_adi,
+                metadata=item.get("meta", {})
+            )
+            indekslenen_sayisi += 1
+        except Exception as err:
+            hatalar.append(f"{dosya_adi}: {str(err)}")
+
+    library_manager.save_library(library)
+    return {
+        "durum": "basarili",
+        "mesaj": f"{indekslenen_sayisi} makale ChromaDB vektör veritabanına indekslendi.",
+        "indekslenen": indekslenen_sayisi,
+        "hatalar": hatalar
+    }
+
 @app.post("/api/kurulum-sifirla")
 async def reset_onboarding():
     """Kurulum sihirbazını test için yeniden açar."""
@@ -527,7 +595,7 @@ async def reset_onboarding():
     return {"mesaj": "Kurulum durumu sıfırlandı."}
 
 GITHUB_REPO = "GuneyOrtac/ortac-academic-assistant"
-CURRENT_VERSION = "0.0.2"
+CURRENT_VERSION = "0.0.3"
 
 @app.get("/api/guncelleme-kontrol")
 async def check_github_update():

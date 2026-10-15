@@ -31,8 +31,8 @@ chroma_db/
 dev/backend/veri/chroma_db/
 dev/backend/veri/pdf_kutuphanesi/*.pdf
 !dev/backend/veri/pdf_kutuphanesi/.gitkeep
-veri/chroma_db/
-veri/pdf_kutuphanesi/
+veri/
+dev/backend/veri/
 
 # IDE & OS
 .agent/
