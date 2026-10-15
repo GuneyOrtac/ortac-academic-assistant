@@ -512,7 +512,7 @@ async def reset_onboarding():
     return {"mesaj": "Kurulum durumu sıfırlandı."}
 
 GITHUB_REPO = "GuneyOrtac/ortac-academic-assistant"
-CURRENT_VERSION = "0.0.1"
+CURRENT_VERSION = "0.0.2"
 
 @app.get("/api/guncelleme-kontrol")
 async def check_github_update():
@@ -535,13 +535,20 @@ async def check_github_update():
             except Exception:
                 is_newer = remote_tag != CURRENT_VERSION
 
+            # En son release'e ait Setup.exe asset'ini bul
+            setup_exe_url = ""
+            for asset in data.get("assets", []):
+                if asset.get("name", "").endswith(".exe"):
+                    setup_exe_url = asset.get("browser_download_url", "")
+                    break
+
             return {
                 "guncel_mi": not is_newer,
                 "mevcut_surum": CURRENT_VERSION,
                 "son_surum": remote_tag,
                 "yayin_tarihi": data.get("published_at", ""),
                 "surum_notlari": data.get("body", "Yeni sürüm yayınlandı."),
-                "indir_url": data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases"),
+                "indir_url": setup_exe_url or data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases"),
                 "release_adi": data.get("name", f"Akademik Asistan v{remote_tag}")
             }
         else:
@@ -561,25 +568,39 @@ async def check_github_update():
 
 @app.post("/api/guncelleme-uygula")
 async def apply_github_update():
-    """Doğrudan GitHub'dan en güncel kodları (git pull) çeker."""
+    """Doğrudan GitHub'dan en güncel kodları çeker veya güncelleme indirmesini başlatır."""
     import subprocess
+    import webbrowser
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    try:
-        res = subprocess.run(
-            ["git", "pull", "origin", "main"],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        output = (res.stdout or "") + (res.stderr or "")
+    
+    if os.path.exists(os.path.join(project_root, ".git")):
+        try:
+            res = subprocess.run(
+                ["git", "pull", "origin", "main"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            output = (res.stdout or "") + (res.stderr or "")
+            return {
+                "durum": "basarili" if res.returncode == 0 else "hata",
+                "cikti": output,
+                "mesaj": "GitHub üzerinden en son kaynak kodlar başarıyla çekildi!" if res.returncode == 0 else "Güncelleme sırasında hata oluştu."
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Güncelleme uygulanamadı: {str(e)}")
+    else:
+        release_url = f"https://github.com/{GITHUB_REPO}/releases/latest"
+        try:
+            webbrowser.open(release_url)
+        except Exception:
+            pass
         return {
-            "durum": "basarili" if res.returncode == 0 else "hata",
-            "cikti": output,
-            "mesaj": "GitHub üzerinden en son güncellemeler başarıyla çekildi!" if res.returncode == 0 else "Güncelleme sırasında hata oluştu."
+            "durum": "basarili",
+            "mesaj": "En yeni sürüm indirme sayfası tarayıcınızda açıldı. Kurulum dosyasını indirip mevcut kurulum dizininize (ör. F:\\AkademikAsistan) kurarak sisteminizi anında güncelleyebilirsiniz.",
+            "url": release_url
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Güncelleme uygulanamadı: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

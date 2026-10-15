@@ -383,7 +383,7 @@ export default function SettingsTab() {
                 }}
               >
                 {updating ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                GitHub'dan Şimdi Güncelle (Git Pull)
+                {updateStatus && !updateStatus.guncel_mi ? `v${updateStatus.son_surum} Güncellemesini İndir & Kur` : "Şimdi Güncelle"}
               </button>
             </div>
           </div>
