@@ -649,36 +649,123 @@ async def check_github_update():
             "hata": str(e)
         }
 
+update_state = {
+    "status": "idle",
+    "percent": 0,
+    "downloaded_mb": 0.0,
+    "total_mb": 0.0,
+    "file_path": "",
+    "error": "",
+    "version": ""
+}
+
+def _download_and_launch_installer(setup_url: str, version: str):
+    global update_state
+    import requests
+    import tempfile
+    
+    temp_dir = tempfile.gettempdir()
+    local_filename = os.path.join(temp_dir, f"ORTAC_Akademik_Asistan_Setup_{version}.exe")
+    
+    update_state["status"] = "downloading"
+    update_state["percent"] = 0
+    update_state["downloaded_mb"] = 0.0
+    update_state["total_mb"] = 0.0
+    update_state["file_path"] = local_filename
+    update_state["error"] = ""
+    update_state["version"] = version
+
+    try:
+        headers = {"User-Agent": "AcademicAssistant-InApp-Updater"}
+        with requests.get(setup_url, headers=headers, stream=True, timeout=1200) as r:
+            r.raise_for_status()
+            total_size = int(r.headers.get("content-length", 0))
+            update_state["total_mb"] = round(total_size / (1024 * 1024), 2)
+            
+            downloaded = 0
+            with open(local_filename, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1024 * 256):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        update_state["downloaded_mb"] = round(downloaded / (1024 * 1024), 2)
+                        if total_size > 0:
+                            update_state["percent"] = int(downloaded * 100 / total_size)
+
+        update_state["percent"] = 100
+        update_state["status"] = "completed"
+
+        # Windows üzerinde kurulum dosyasını doğrudan çalıştır
+        try:
+            if hasattr(os, "startfile"):
+                os.startfile(local_filename)
+            else:
+                subprocess.Popen([local_filename], shell=True)
+        except Exception as launch_err:
+            print(f"Kurulum başlatma uyarısı: {launch_err}")
+    except Exception as e:
+        update_state["status"] = "error"
+        update_state["error"] = str(e)
+
+@app.get("/api/guncelleme-durum")
+async def get_update_status():
+    """İndirme ve güncelleme ilerleme durumunu anlık döner."""
+    return update_state
+
+@app.post("/api/guncelleme-calistir")
+async def launch_downloaded_installer():
+    """İndirilmiş kurulum dosyasını manuel başlatır."""
+    global update_state
+    fpath = update_state.get("file_path")
+    if fpath and os.path.exists(fpath):
+        try:
+            if hasattr(os, "startfile"):
+                os.startfile(fpath)
+            else:
+                subprocess.Popen([fpath], shell=True)
+            return {"durum": "basarili", "mesaj": "Kurulum sihirbazı başlatıldı."}
+        except Exception as e:
+            return {"durum": "hata", "mesaj": f"Kurulum başlatılamadı: {e}"}
+    return {"durum": "hata", "mesaj": "İndirilmiş kurulum dosyası bulunamadı."}
+
 @app.post("/api/guncelleme-uygula")
 async def apply_github_update():
-    """GitHub Releases üzerinden en güncel kurulum dosyasının (Setup.exe) indirilmesini başlatır."""
-    import webbrowser
+    """GitHub Releases üzerinden en güncel kurulum dosyasını (Setup.exe) uygulama içinde indirir ve çalıştırır."""
+    global update_state
+    if update_state.get("status") == "downloading":
+        return {"durum": "zaten_indiriliyor", "mesaj": "Güncelleme paketi şu anda arka planda indiriliyor..."}
+
     import requests
-    
-    download_url = f"https://github.com/{GITHUB_REPO}/releases/latest"
+    import threading
     try:
         url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
         headers = {"User-Agent": "AcademicAssistant-Updater"}
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
             data = res.json()
+            remote_tag = data.get("tag_name", f"v{CURRENT_VERSION}").lstrip("v")
+            setup_exe_url = ""
             for asset in data.get("assets", []):
                 if asset.get("name", "").endswith(".exe"):
-                    download_url = asset.get("browser_download_url", download_url)
+                    setup_exe_url = asset.get("browser_download_url", "")
                     break
-    except Exception:
-        pass
 
-    try:
-        webbrowser.open(download_url)
-    except Exception:
-        pass
+            if not setup_exe_url:
+                raise ValueError("En son sürüm için geçerli bir Setup.exe paketi bulunamadı.")
 
-    return {
-        "durum": "basarili",
-        "mesaj": "En yeni sürüm kurulum paketi tarayıcınızda indirilmeye başlandı! İndirilen kurulum dosyasını çalıştırarak verileriniz ve kütüphaneniz korunarak saniyeler içinde güncelleyebilirsiniz.",
-        "url": download_url
-    }
+            t = threading.Thread(target=_download_and_launch_installer, args=(setup_exe_url, remote_tag), daemon=True)
+            t.start()
+
+            return {
+                "durum": "baslatildi",
+                "mesaj": f"v{remote_tag} güncelleme paketi uygulama içine indirilmeye başlandı.",
+                "url": setup_exe_url,
+                "surum": remote_tag
+            }
+        else:
+            raise ValueError(f"GitHub Releases API yanıt vermedi ({res.status_code})")
+    except Exception as e:
+        return {"durum": "hata", "mesaj": f"Güncelleme başlatılamadı: {str(e)}"}
 
 if __name__ == "__main__":
     import uvicorn

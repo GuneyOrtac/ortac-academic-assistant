@@ -28,6 +28,16 @@ const modelOptions: Record<string, string[]> = {
   nvidia: ['meta/llama-3.1-70b-instruct', 'meta/llama-3.1-405b-instruct', 'meta/llama-3.2-11b-vision-instruct', 'meta/llama-3.2-90b-vision-instruct', 'mistralai/mixtral-8x22b-instruct-v0.1']
 };
 
+interface UpdateProgress {
+  status: 'idle' | 'downloading' | 'completed' | 'error';
+  percent: number;
+  downloaded_mb: number;
+  total_mb: number;
+  file_path?: string;
+  error?: string;
+  version?: string;
+}
+
 export default function SettingsTab() {
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +49,7 @@ export default function SettingsTab() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [updateMsg, setUpdateMsg] = useState('');
+  const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
 
@@ -72,21 +83,46 @@ export default function SettingsTab() {
     }
   };
 
+  const pollUpdateProgress = () => {
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/guncelleme-durum');
+        if (res.ok) {
+          const prog: UpdateProgress = await res.json();
+          setUpdateProgress(prog);
+          if (prog.status === 'completed') {
+            clearInterval(timer);
+            setUpdating(false);
+            setUpdateMsg('✓ Güncelleme paketi başarıyla indirildi ve kurulum sihirbazı otomatik olarak başlatıldı!');
+          } else if (prog.status === 'error') {
+            clearInterval(timer);
+            setUpdating(false);
+            setUpdateMsg(`İndirme hatası: ${prog.error}`);
+          }
+        }
+      } catch {
+        // Polling devam
+      }
+    }, 600);
+  };
+
   const handleApplyUpdate = async () => {
-    if (!window.confirm("GitHub'daki en son sürüm kurulum paketi indirilerek sistem güncellenecektir. Onaylıyor musunuz?")) return;
+    if (!window.confirm("GitHub'daki en son sürüm kurulum paketi doğrudan uygulama içine indirilerek sistem güncellenecektir. Onaylıyor musunuz?")) return;
     setUpdating(true);
     setUpdateMsg('');
+    setUpdateProgress({ status: 'downloading', percent: 0, downloaded_mb: 0, total_mb: 0 });
     try {
       const res = await fetch('http://127.0.0.1:8000/api/guncelleme-uygula', { method: 'POST' });
       const data = await res.json();
-      if (res.ok) {
-        setUpdateMsg(data.mesaj || 'Güncelleme paketi tarayıcınızda açıldı!');
+      if (res.ok && (data.durum === 'baslatildi' || data.durum === 'zaten_indiriliyor')) {
+        setUpdateMsg(data.mesaj || 'Güncelleme paketi indiriliyor...');
+        pollUpdateProgress();
       } else {
-        setUpdateMsg(data.detail || 'Güncelleme hatası.');
+        setUpdateMsg(data.mesaj || data.detail || 'Güncelleme başlatılamadı.');
+        setUpdating(false);
       }
     } catch (e: any) {
       setUpdateMsg('Bağlantı hatası: ' + e.message);
-    } finally {
       setUpdating(false);
     }
   };
@@ -459,8 +495,47 @@ export default function SettingsTab() {
             </div>
           </div>
 
-          {updateMsg && (
-            <div style={{ padding: '10px 14px', borderRadius: '6px', backgroundColor: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', fontSize: '13px' }}>
+          {updateProgress && updateProgress.status === 'downloading' && (
+            <div style={{ marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '6px', padding: '14px', border: '1px solid rgba(59,130,246,0.3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
+                <span style={{ color: '#60a5fa', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Loader2 size={14} className="animate-spin" />
+                  Güncelleme Paketi İndiriliyor: %{updateProgress.percent}
+                </span>
+                <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                  {updateProgress.downloaded_mb} MB / {updateProgress.total_mb} MB
+                </span>
+              </div>
+              <div style={{ width: '100%', height: '8px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ width: `${updateProgress.percent}%`, height: '100%', backgroundColor: 'var(--accent-color)', transition: 'width 0.2s ease' }} />
+              </div>
+              <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                Dosya doğrudan uygulama içinde güvenle indiriliyor. İndirme bittiğinde kurulum penceresi ekranınızda otomatik açılacaktır.
+              </span>
+            </div>
+          )}
+
+          {updateProgress && updateProgress.status === 'completed' && (
+            <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '12px 16px' }}>
+              <div>
+                <span style={{ color: '#34d399', fontSize: '13px', fontWeight: 600, display: 'block' }}>
+                  ✓ Güncelleme Paketi Başarıyla İndirildi ({updateProgress.total_mb} MB)
+                </span>
+                <span style={{ color: '#cbd5e1', fontSize: '12px' }}>
+                  Kurulum sihirbazı otomatik olarak başlatıldı. Kurulum sihirbazını takip ederek güncellemeyi bitirebilirsiniz.
+                </span>
+              </div>
+              <button
+                onClick={async () => { await fetch('http://127.0.0.1:8000/api/guncelleme-calistir', { method: 'POST' }); }}
+                style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '4px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                Kurulum Penceresini Aç
+              </button>
+            </div>
+          )}
+
+          {updateMsg && (!updateProgress || updateProgress.status === 'idle' || updateProgress.status === 'error') && (
+            <div style={{ padding: '10px 14px', borderRadius: '6px', backgroundColor: updateProgress?.status === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)', border: updateProgress?.status === 'error' ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(59,130,246,0.3)', color: updateProgress?.status === 'error' ? '#f87171' : '#60a5fa', fontSize: '13px' }}>
               {updateMsg}
             </div>
           )}
