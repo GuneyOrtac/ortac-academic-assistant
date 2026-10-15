@@ -411,7 +411,7 @@ function App() {
         </div>
         
         <div className="sidebar-footer">
-          <span className="footer-text">Versiyon 2.2.6</span>
+          <span className="footer-text">Versiyon 0.0.1</span>
           <span className="footer-name">Dr. Güney ORTAÇ</span>
           <span className="footer-text">© Tüm Hakları Saklıdır</span>
         </div>
@@ -453,7 +453,7 @@ function App() {
               </span>
             ) : (
               <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
-                v2.2.6 (Güncel ✓)
+                v0.0.1 (Güncel ✓)
               </span>
             )}
           </div>

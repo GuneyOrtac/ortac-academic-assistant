@@ -398,7 +398,7 @@ export default function SettingsTab() {
             <div style={{ padding: '12px 16px', borderRadius: '6px', backgroundColor: updateStatus.guncel_mi ? 'rgba(16,185,129,0.08)' : 'rgba(59,130,246,0.12)', border: updateStatus.guncel_mi ? '1px solid rgba(16,185,129,0.25)' : '1px solid #3b82f6', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, color: updateStatus.guncel_mi ? '#34d399' : '#60a5fa' }}>
-                  {updateStatus.guncel_mi ? '✓ Sisteminiz en son sürümde (v2.2.6) çalışıyor.' : `🚀 Yeni Sürüm Mevcut: v${updateStatus.son_surum}`}
+                  {updateStatus.guncel_mi ? `✓ Sisteminiz en son sürümde (v${updateStatus.mevcut_surum}) çalışıyor.` : `🚀 Yeni Sürüm Mevcut: v${updateStatus.son_surum}`}
                 </span>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Mevcut: v{updateStatus.mevcut_surum} • GitHub: v{updateStatus.son_surum}

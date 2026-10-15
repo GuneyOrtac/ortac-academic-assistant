@@ -11,15 +11,28 @@ const FRONTEND_DEV_URL = 'http://localhost:5173';
 // 1. Python Backend Sürecini Başlatma
 function startBackend() {
   const isDev = !app.isPackaged;
-  const projectRoot = path.resolve(__dirname, '..', '..', '..');
-  const pythonExecutable = path.join(projectRoot, 'dev', 'backend', '.venv', 'Scripts', 'python.exe');
-  const backendScript = path.join(projectRoot, 'dev', 'backend', 'main.py');
+  let backendExe = '';
+  let backendCwd = '';
+  let args = [];
 
-  console.log('[ELECTRON] Backend başlatılıyor:', pythonExecutable, backendScript);
+  if (isDev) {
+    const projectRoot = path.resolve(__dirname, '..', '..', '..');
+    backendExe = path.join(projectRoot, 'dev', 'backend', '.venv', 'Scripts', 'python.exe');
+    const backendScript = path.join(projectRoot, 'dev', 'backend', 'main.py');
+    backendCwd = path.join(projectRoot, 'dev', 'backend');
+    args = [backendScript];
+  } else {
+    // Packaged Electron app: backend executable in extraResources
+    backendExe = path.join(process.resourcesPath, 'backend', 'AkademikAsistan_Backend.exe');
+    backendCwd = path.join(process.resourcesPath, 'backend');
+    args = [];
+  }
+
+  console.log('[ELECTRON] Backend başlatılıyor:', backendExe, args);
 
   try {
-    backendProcess = spawn(pythonExecutable, [backendScript], {
-      cwd: path.join(projectRoot, 'dev', 'backend'),
+    backendProcess = spawn(backendExe, args, {
+      cwd: backendCwd,
       detached: false,
       stdio: 'pipe'
     });
@@ -41,14 +54,14 @@ function startBackend() {
 }
 
 // 2. Backend'in Hazır Olduğunu Kontrol Etme (Polling)
-function waitForBackend(callback, retries = 30) {
+function waitForBackend(callback, retries = 45) {
   if (retries <= 0) {
     console.warn('[ELECTRON] Backend zaman aşımına uğradı, yine de pencere açılıyor.');
     callback();
     return;
   }
 
-  http.get(`http://localhost:${BACKEND_PORT}/api/sistem-bilgisi`, (res) => {
+  http.get(`http://127.0.0.1:${BACKEND_PORT}/api/sistem-bilgisi`, (res) => {
     if (res.statusCode === 200) {
       console.log('[ELECTRON] Backend başarıyla yanıt verdi.');
       callback();
@@ -62,15 +75,21 @@ function waitForBackend(callback, retries = 30) {
 
 // 3. Ana Pencereyi Oluşturma
 function createMainWindow() {
+  const isDev = !app.isPackaged;
+  const iconPath = isDev
+    ? path.join(__dirname, '..', '..', '..', 'Logo', 'icon.ico')
+    : path.join(__dirname, '..', 'assets', 'icon.ico');
+
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
     minWidth: 1024,
     minHeight: 700,
     backgroundColor: '#09090b',
-    title: 'ORTAC Geo|Science - Akademik Asistan',
-    icon: path.join(__dirname, '..', '..', '..', 'Logo', 'icon.ico'),
+    title: 'ORTAC Geo|Science - Akademik Asistan v0.0.1',
+    icon: iconPath,
     frame: true,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -78,17 +97,15 @@ function createMainWindow() {
     }
   });
 
-  const isDev = !app.isPackaged;
+  const distIndex = path.join(__dirname, '..', 'dist', 'index.html');
+
   if (isDev) {
-    // Geliştirme modunda Vite dev sunucusunu dene, açılamazsa yerel dist'i yükle
     http.get(FRONTEND_DEV_URL, (res) => {
       mainWindow.loadURL(FRONTEND_DEV_URL);
     }).on('error', () => {
-      const distIndex = path.join(__dirname, '..', '..', '..', 'dev', 'frontend', 'dist', 'index.html');
       mainWindow.loadFile(distIndex);
     });
   } else {
-    const distIndex = path.join(__dirname, '..', '..', '..', 'dev', 'frontend', 'dist', 'index.html');
     mainWindow.loadFile(distIndex);
   }
 
@@ -111,7 +128,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   // Backend sürecini güvenle sonlandır
-  if (backendProcess) {
+  if (backendProcess && backendProcess.pid) {
     console.log('[ELECTRON] Backend süreci sonlandırılıyor...');
     try {
       if (process.platform === 'win32') {

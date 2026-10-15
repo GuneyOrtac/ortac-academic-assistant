@@ -20,7 +20,7 @@ load_dotenv()
 app = FastAPI(
     title="Akademik Asistan API",
     description="Yapay Zeka Destekli Masaüstü Akademik Asistan Backend Motoru",
-    version="1.0.0"
+    version="0.0.1"
 )
 
 app.add_middleware(
@@ -487,7 +487,7 @@ async def reset_onboarding():
     return {"mesaj": "Kurulum durumu sıfırlandı."}
 
 GITHUB_REPO = "GuneyOrtac/ortac-academic-assistant"
-CURRENT_VERSION = "2.2.6"
+CURRENT_VERSION = "0.0.1"
 
 @app.get("/api/guncelleme-kontrol")
 async def check_github_update():

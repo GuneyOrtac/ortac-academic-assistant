@@ -3,7 +3,7 @@ chcp 65001 >nul
 title ORTAC Geo^|Science - Akademik Asistan
 
 echo ========================================================
-echo   ORTAC Geo^|Science — Akademik Asistan v2.2.6
+echo   ORTAC Geo^|Science — Akademik Asistan v0.0.1
 echo   Yapay Zeka Destekli Arastirma ve Literatur Platformu
 echo ========================================================
 echo.

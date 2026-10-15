@@ -52,3 +52,12 @@ MetaGPT/
 Yeni Metin Belgesi.txt
 local_agent.py
 *.yedek
+
+# Packaging & Build Outputs
+build/
+dev/backend/build/
+dev/backend/dist/
+product/adim-8/releases/
+product/adim-8/electron-builder-uygulama/backend/
+product/adim-8/electron-builder-uygulama/dist/
+*.spec

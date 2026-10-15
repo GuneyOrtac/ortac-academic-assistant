@@ -75,7 +75,7 @@ Aşağıdaki REST endpoints başarıyla implement edilmiş ve çalıştırılmak
   - Backend uç noktaları: `/api/guncelleme-kontrol` ve `/api/guncelleme-uygula`
   - Canlı Sürüm Etiketi & Parlayan Rozet (`UpdateBadge`)
   - Arayüzden tek tıkla GitHub Releases sorgulama ve doğrudan `git pull` ile güncelleme.
-- [x] **GitHub v2.2.6 Resmi Release Yayını:** [Releases v2.2.6](https://github.com/GuneyOrtac/ortac-academic-assistant/releases/tag/v2.2.6) ilk sürümü GitHub üzerinde yayınlandı.
+- [x] **GitHub v0.0.1 Resmi Release Yayını:** [Releases v0.0.1](https://github.com/GuneyOrtac/ortac-academic-assistant/releases/tag/v0.0.1) ilk sürümü GitHub üzerinde yayınlandı.
 
 ## 🚧 Devam Eden
 - [ ] Token tasarrufu optimizasyonları
