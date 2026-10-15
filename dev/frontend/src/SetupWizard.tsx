@@ -68,14 +68,22 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
   const [apiValidated, setApiValidated] = useState<boolean | null>(null);
   const [storagePath, setStoragePath] = useState<string>("C:\\AkademikAsistan");
 
+  // Custom Installer Real Extraction State
+  const isInstallerMode = !!(window as any).electronAPI?.isInstaller;
+  const [installing, setInstalling] = useState(false);
+  const [installPercent, setInstallPercent] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [activeInstallStep, setActiveInstallStep] = useState<number>(0);
+  const [installedExe, setInstalledExe] = useState<string>('');
+  const [installFinished, setInstallFinished] = useState(false);
+
   useEffect(() => {
-    fetch(`${API_BASE}/api/sistem-bilgisi`)
-      .then(res => res.json())
-      .then(data => {
+    // 1. Installer Modunda Node.js IPC ile donanım ve sürücüleri al
+    if ((window as any).electronAPI?.getSystemInfo) {
+      (window as any).electronAPI.getSystemInfo().then((data: any) => {
         if (data.donanim) setHardware(data.donanim);
         if (data.suruculer) {
           setDrives(data.suruculer);
-          // En çok boş yeri olan sürücüyü varsayılan seç
           if (data.suruculer.length > 0) {
             const sorted = [...data.suruculer].sort((a: DriveInfo, b: DriveInfo) => b.free_gb - a.free_gb);
             const bestDrive = sorted[0].mountpoint.replace(/\\$/, "");
@@ -83,8 +91,30 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
           }
         }
         if (data.profiller) setProfiles(data.profiller);
-        
-        // Zaten bir API anahtarı kayıtlıysa hazır getir
+        setLoading(false);
+      }).catch(() => {
+        fallbackFetchSystemInfo();
+      });
+      return;
+    }
+
+    fallbackFetchSystemInfo();
+  }, []);
+
+  const fallbackFetchSystemInfo = () => {
+    fetch(`${API_BASE}/api/sistem-bilgisi`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.donanim) setHardware(data.donanim);
+        if (data.suruculer) {
+          setDrives(data.suruculer);
+          if (data.suruculer.length > 0) {
+            const sorted = [...data.suruculer].sort((a: DriveInfo, b: DriveInfo) => b.free_gb - a.free_gb);
+            const bestDrive = sorted[0].mountpoint.replace(/\\$/, "");
+            setStoragePath(`${bestDrive}\\AkademikAsistan`);
+          }
+        }
+        if (data.profiller) setProfiles(data.profiller);
         if (data.mevcut_ayarlar?.api_keys?.gemini) {
           setCustomApiKey(data.mevcut_ayarlar.api_keys.gemini);
         }
@@ -94,6 +124,32 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
         console.error("Sistem bilgisi alınamadı:", err);
         setLoading(false);
       });
+  };
+
+  // Kurulum İlerleme Dinleyicisi
+  useEffect(() => {
+    if ((window as any).electronAPI?.onInstallProgress) {
+      const cleanup = (window as any).electronAPI.onInstallProgress((data: any) => {
+        if (data.step) {
+          setActiveInstallStep(data.step);
+          if (data.completed) {
+            setCompletedSteps(prev => Array.from(new Set([...prev, data.step])));
+          }
+        }
+        if (data.percent !== undefined) {
+          setInstallPercent(data.percent);
+        }
+        if (data.step === 5 && data.completed) {
+          setInstallFinished(true);
+          setInstalling(false);
+        }
+        if (data.error) {
+          setErrorMsg(data.error);
+          setInstalling(false);
+        }
+      });
+      return cleanup;
+    }
   }, []);
 
   // Seçilen modelin disk gereksinimi (+20 GB RAG payı)
@@ -122,6 +178,52 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
   const currentFreeGb = selectedDrive ? selectedDrive.free_gb : 100;
   const isDiskSpaceSufficient = currentFreeGb >= requiredDiskGb;
 
+  // Native Klasör Seçici Aç
+  const handleBrowseFolder = async () => {
+    if ((window as any).electronAPI?.selectDirectory) {
+      const chosen = await (window as any).electronAPI.selectDirectory();
+      if (chosen) {
+        setStoragePath(chosen);
+      }
+    } else {
+      if (drives.length > 1) {
+        const other = drives.find(d => !storagePath.toUpperCase().startsWith(d.mountpoint.replace(/\\$/, "").toUpperCase()));
+        if (other) setStoragePath(`${other.mountpoint.replace(/\\$/, "")}\\AkademikAsistan`);
+      }
+    }
+  };
+
+  // Gerçek Kurulumu Başlat (Installer Modu)
+  const handleStartRealInstallation = async () => {
+    setInstalling(true);
+    setErrorMsg('');
+    try {
+      const res = await (window as any).electronAPI.startInstallation({
+        targetDir: storagePath,
+        modelProfile: selectedModel,
+        apiMode,
+        customApiKey
+      });
+      if (res.success) {
+        setInstalledExe(res.targetExe);
+      } else {
+        setErrorMsg(res.error || "Kurulum sırasında hata oluştu.");
+        setInstalling(false);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message);
+      setInstalling(false);
+    }
+  };
+
+  const handleLaunchApp = () => {
+    if ((window as any).electronAPI?.launchApp) {
+      (window as any).electronAPI.launchApp(installedExe);
+    } else {
+      onComplete();
+    }
+  };
+
   // API Doğrulama Testi
   const handleTestApiKey = async () => {
     if (!customApiKey.trim()) return;
@@ -141,8 +243,13 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
     }
   };
 
-  // Kurulumu Tamamla
+  // Kurulumu Tamamla (Normal Web/Uygulama Modu)
   const handleFinalSubmit = async () => {
+    if (isInstallerMode) {
+      handleStartRealInstallation();
+      return;
+    }
+
     setSubmitting(true);
     setErrorMsg('');
     try {
@@ -671,13 +778,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                   }}
                 />
                 <button
-                  onClick={() => {
-                    // Varsayılan sürücü alternatifine dön
-                    if (drives.length > 1) {
-                      const other = drives.find(d => !storagePath.toUpperCase().startsWith(d.mountpoint.replace(/\\$/, "").toUpperCase()));
-                      if (other) setStoragePath(`${other.mountpoint.replace(/\\$/, "")}\\AkademikAsistan`);
-                    }
-                  }}
+                  onClick={handleBrowseFolder}
                   style={{
                     background: '#27272a',
                     color: '#ffffff',
@@ -789,80 +890,164 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
           </div>
         )}
 
-        {/* ===================== ADIM 4: DOĞRULAMA VE ÖZET ===================== */}
+        {/* ===================== ADIM 4: DOĞRULAMA VE KURULUM ===================== */}
         {step === 4 && (
           <div style={{ width: '100%', maxWidth: '750px', display: 'flex', flexDirection: 'column' }}>
             <h1 style={{ fontSize: '24px', fontWeight: 700, letterSpacing: '-0.025em', marginBottom: '0.5rem', textAlign: 'center' }}>
-              Kurulum Tamamlandı ve Sistem Hazır
+              {isInstallerMode 
+                ? (installFinished ? "Kurulum Başarıyla Tamamlandı!" : "Kurulum ve Dosya Dağıtımı") 
+                : "Kurulum Tamamlandı ve Sistem Hazır"}
             </h1>
             <p style={{ fontSize: '13px', color: '#a1a1aa', marginBottom: '2rem', textAlign: 'center' }}>
-              Yapılandırılan tüm bileşenlerin doğrulama listesi aşağıdadır:
+              {isInstallerMode 
+                ? (installFinished ? "Tüm program dosyaları ve yerel yapay zekâ motoru başarıyla kuruldu." : "Seçtiğiniz ayarlar hedefe aktarılacaktır. Kurulumu başlatmak için butona tıklayın.")
+                : "Yapılandırılan tüm bileşenlerin doğrulama listesi aşağıdadır:"}
             </p>
 
-            <div style={{
-              background: '#121215',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '12px',
-              padding: '0.5rem 0',
-              display: 'flex',
-              flexDirection: 'column',
-              marginBottom: '1.5rem'
-            }}>
-              {/* Satır 1: Kurulum Dizini */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <CheckCircle2 size={18} className="text-emerald-400" />
-                <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: '#94a3b8' }}>Kurulum ve Kütüphane Dizini</span>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5', fontFamily: 'monospace' }}>
-                    {storagePath} ({currentFreeGb} GB Boş • Hazır ✓)
-                  </span>
-                </div>
-              </div>
+            {/* Installer Modunda Dinamik Adım Listesi */}
+            {isInstallerMode ? (
+              <div style={{
+                background: '#121215',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '12px',
+                padding: '0.5rem 0',
+                display: 'flex',
+                flexDirection: 'column',
+                marginBottom: '1.5rem'
+              }}>
+                {[
+                  { id: 1, title: "Donanım ve Hedef Sürücü Doğrulaması", desc: `${storagePath} dizini (${currentFreeGb} GB boş alan) onaylandı` },
+                  { id: 2, title: "Program Çekirdeği ve Yerel AI Motorunun Aktarılması", desc: installPercent > 0 ? `%${installPercent} tamamlandı - Python, PyTorch ve çalışma motoru kuruluyor` : "Python, PyTorch ve yerel motor dosyaları hedefe aktarılacak" },
+                  { id: 3, title: "Model Profili ve Veri Kütüphanesinin Yapılandırılması", desc: `${currentProfile.name} ve yerel ChromaDB dizini bağlandı` },
+                  { id: 4, title: "Masaüstü Kısayolunun Oluşturulması", desc: "Masaüstüne 'ORTAC Akademik Asistan' kısayolu yerleştirildi" },
+                  { id: 5, title: "Kurulumun Başarıyla Tamamlanması", desc: "Sistem %100 yerel ve çevrimdışı çalışmaya hazır" }
+                ].map(task => {
+                  const isDone = completedSteps.includes(task.id);
+                  const isCurrent = activeInstallStep === task.id && installing;
+                  return (
+                    <div 
+                      key={task.id}
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '1rem', 
+                        padding: '1rem 1.5rem', 
+                        borderBottom: task.id < 5 ? '1px solid rgba(255,255,255,0.06)' : 'none' 
+                      }}
+                    >
+                      {isDone ? (
+                        <CheckCircle2 size={18} className="text-emerald-400" />
+                      ) : isCurrent ? (
+                        <Loader2 size={18} className="animate-spin text-blue-400" />
+                      ) : (
+                        <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)' }} />
+                      )}
+                      
+                      <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: isDone ? '#f4f4f5' : (isCurrent ? '#60a5fa' : '#71717a') }}>
+                            {task.title}
+                          </div>
+                          <div style={{ fontSize: '11px', color: isDone ? '#a1a1aa' : (isCurrent ? '#93c5fd' : '#52525b'), marginTop: '2px' }}>
+                            {task.desc}
+                          </div>
+                        </div>
 
-              {/* Satır 2: Vektör Motoru */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <CheckCircle2 size={18} className="text-emerald-400" />
-                <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: '#94a3b8' }}>Vektörleme Motoru</span>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
-                    {currentProfile.name} ({currentProfile.context_tokens} Token • Hazır ✓)
-                  </span>
-                </div>
+                        <div>
+                          {isDone ? (
+                            <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600 }}>Tamamlandı ✓</span>
+                          ) : isCurrent ? (
+                            <span style={{ fontSize: '11px', color: '#60a5fa', fontWeight: 600 }}>İşleniyor...</span>
+                          ) : (
+                            <span style={{ fontSize: '11px', color: '#52525b' }}>Bekliyor</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            ) : (
+              /* Normal Web / Uygulama Modu */
+              <div style={{
+                background: '#121215',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '12px',
+                padding: '0.5rem 0',
+                display: 'flex',
+                flexDirection: 'column',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <CheckCircle2 size={18} className="text-emerald-400" />
+                  <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', color: '#94a3b8' }}>Kurulum ve Kütüphane Dizini</span>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5', fontFamily: 'monospace' }}>
+                      {storagePath} ({currentFreeGb} GB Boş • Hazır ✓)
+                    </span>
+                  </div>
+                </div>
 
-              {/* Satır 3: Yapay Zeka API */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <CheckCircle2 size={18} className="text-emerald-400" />
-                <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: '#94a3b8' }}>Yapay Zeka API Sağlayıcısı</span>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
-                    {apiMode === "system_default" ? "Sistem Varsayılan API Havuzu (Aktif ✓)" : "Kendi Özel Google Gemini API Anahtarınız (Aktif ✓)"}
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <CheckCircle2 size={18} className="text-emerald-400" />
+                  <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', color: '#94a3b8' }}>Vektörleme Motoru</span>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
+                      {currentProfile.name} ({currentProfile.context_tokens} Token • Hazır ✓)
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Satır 4: Donanım Profili */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <CheckCircle2 size={18} className="text-emerald-400" />
-                <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: '#94a3b8' }}>Donanım Uyumu</span>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
-                    {hardware.toplam_ram_gb} GB Bellek • Optimum Performans Modu ✓
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <CheckCircle2 size={18} className="text-emerald-400" />
+                  <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', color: '#94a3b8' }}>Yapay Zeka API Sağlayıcısı</span>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
+                      {apiMode === "system_default" ? "Sistem Varsayılan API Havuzu (Aktif ✓)" : "Kendi Özel Google Gemini API Anahtarınız (Aktif ✓)"}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Satır 5: Veri Güvenliği */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem' }}>
-                <CheckCircle2 size={18} className="text-emerald-400" />
-                <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: '#94a3b8' }}>Veri Gizliliği ve Güvenlik</span>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
-                    %100 Yerel ChromaDB (Çevrimdışı Depolama ✓)
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <CheckCircle2 size={18} className="text-emerald-400" />
+                  <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', color: '#94a3b8' }}>Donanım Uyumu</span>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
+                      {hardware.toplam_ram_gb} GB Bellek • Optimum Performans Modu ✓
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem' }}>
+                  <CheckCircle2 size={18} className="text-emerald-400" />
+                  <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', color: '#94a3b8' }}>Veri Gizliliği ve Güvenlik</span>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
+                      %100 Yerel ChromaDB (Çevrimdışı Depolama ✓)
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* İlerleme Çubuğu */}
+            {installing && !installFinished && (
+              <div style={{
+                height: '6px',
+                width: '100%',
+                background: 'rgba(255,255,255,0.06)',
+                borderRadius: '3px',
+                overflow: 'hidden',
+                marginBottom: '1.25rem'
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${installPercent}%`,
+                  background: '#3b82f6',
+                  transition: 'width 0.4s ease'
+                }} />
+              </div>
+            )}
 
             {errorMsg && (
               <div style={{
@@ -892,7 +1077,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
         paddingTop: '1.5rem',
         borderTop: '1px solid rgba(255,255,255,0.08)'
       }}>
-        {step > 1 ? (
+        {step > 1 && !installing ? (
           <button
             onClick={() => setStep((prev) => (prev - 1) as any)}
             style={{
@@ -939,35 +1124,101 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
             Devam Et <ArrowRight size={16} />
           </button>
         ) : (
-          <button
-            onClick={handleFinalSubmit}
-            disabled={submitting}
-            style={{
-              background: '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '0.75rem 2rem',
-              fontSize: '14px',
-              fontWeight: 700,
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 0 20px rgba(37, 99, 235, 0.5)',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {submitting ? (
-              <>
-                <Loader2 size={16} className="animate-spin" /> Yapılandırılıyor...
-              </>
+          isInstallerMode ? (
+            installFinished ? (
+              <button
+                onClick={handleLaunchApp}
+                style={{
+                  background: '#10b981',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.75rem 2.25rem',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 0 25px rgba(16, 185, 129, 0.5)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                ORTAC Akademik Asistan'ı Başlat 🚀
+              </button>
+            ) : installing ? (
+              <button
+                disabled
+                style={{
+                  background: '#2563eb',
+                  opacity: 0.8,
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.75rem 2rem',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Loader2 size={16} className="animate-spin" /> Kuruluyor (%{installPercent})...
+              </button>
             ) : (
-              <>
-                Sistemi Başlat ve Çalışma Alanını Aç <ArrowRight size={16} />
-              </>
-            )}
-          </button>
+              <button
+                onClick={handleStartRealInstallation}
+                style={{
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.75rem 2rem',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 0 20px rgba(37, 99, 235, 0.5)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Kurulumu Başlat ve Dosyaları Aktar 🚀
+              </button>
+            )
+          ) : (
+            <button
+              onClick={handleFinalSubmit}
+              disabled={submitting}
+              style={{
+                background: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '0.75rem 2rem',
+                fontSize: '14px',
+                fontWeight: 700,
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 0 20px rgba(37, 99, 235, 0.5)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Yapılandırılıyor...
+                </>
+              ) : (
+                <>
+                  Sistemi Başlat ve Çalışma Alanını Aç <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+          )
         )}
       </div>
 

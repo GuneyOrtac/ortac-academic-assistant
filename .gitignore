@@ -58,6 +58,12 @@ build/
 dev/backend/build/
 dev/backend/dist/
 product/adim-8/releases/
+product/adim-8/final-release/
+product/adim-8/test_extract/
+product/adim-8/custom-installer/payload/
+product/adim-8/custom-installer/dist/
+product/adim-8/custom-installer/node_modules/
 product/adim-8/electron-builder-uygulama/backend/
 product/adim-8/electron-builder-uygulama/dist/
 *.spec
+
