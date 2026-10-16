@@ -1,6 +1,6 @@
 {
   "name": "akademik-asistan",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "ORTAC Geo|Science - Akademik Asistan",
   "main": "build/main.js",
   "scripts": {
@@ -67,7 +67,7 @@
       "shortcutName": "ORTAC Akademik Asistan",
       "runAfterFinish": true,
       "include": "nsis/uninstaller.nsh",
-      "artifactName": "ORTAC.Akademik.Asistan.Setup.0.0.4.exe"
+      "artifactName": "ORTAC.Akademik.Asistan.Setup.${version}.exe"
     }
   }
 }
