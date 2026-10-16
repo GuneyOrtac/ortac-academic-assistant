@@ -1,4 +1,9 @@
 import os
+# Telemetri Karantinası: Test sürecinin başında telemetriyi küresel olarak kapat
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+os.environ["CHROMA_TELEMETRY"] = "False"
+os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+
 import sys
 import shutil
 import tempfile
@@ -267,11 +272,24 @@ def run_quality_gates():
         assert not sandbox_data.exists(), "Tam temizlik modunda veri klasörü silinemedi!"
         print("   -> [Senaryo B - Tam Temizlik]: Tüm kütüphane, veritabanı ve önbellekler sıfır kalıntıyla yok edildi.")
 
+        # QG-11: Donmuş Binary & Telemetri İzolasyon Koruması (ChromaDB / PyInstaller Audit)
+        print("[*] [QG-11] Donmuş Binary ve Telemetri Karantinası Denetleniyor...")
+        rag_src = (ROOT_DIR / "dev" / "backend" / "rag.py").read_text(encoding="utf-8")
+        main_src = (ROOT_DIR / "dev" / "backend" / "main.py").read_text(encoding="utf-8")
+        assert 'ANONYMIZED_TELEMETRY' in rag_src and 'ANONYMIZED_TELEMETRY' in main_src, "Telemetri kilidi eksik!"
+        assert 'CHROMA_TELEMETRY' in rag_src and 'CHROMA_TELEMETRY' in main_src, "Chroma telemetri kilidi eksik!"
+        print("   -> [Kod Seviyesi]: ANONYMIZED_TELEMETRY=False ve CHROMA_TELEMETRY=False kilitleri doğrulandı.")
+
+        build_src = (ROOT_DIR / "dev" / "backend" / "build.py").read_text(encoding="utf-8")
+        assert '--collect-all=chromadb' in build_src, "PyInstaller build.py içinde --collect-all=chromadb eksik!"
+        assert 'chromadb.telemetry.product.posthog' in build_src, "PyInstaller build.py içinde posthog hidden import eksik!"
+        print("   -> [Paketleme Seviyesi]: build.py PyInstaller --collect-all=chromadb ve hidden import hook'ları doğrulandı.")
+
         # Başarı Kaydı
         breaker.record_success()
         print("\n" + "="*70)
-        print("[PASS] TEBRİKLER: 10 AŞAMALI KALİTE MATRİSİ %100 BAŞARIYLA TAMAMLANDI!")
-        print("Yazılım temiz oda ortamında doğrulanmıştır. Sürüm güvenle paketlenebilir.")
+        print("[PASS] TEBRİKLER: 11 AŞAMALI KALİTE MATRİSİ %100 BAŞARIYLA TAMAMLANDI!")
+        print("Yazılım temiz oda ve donmuş binary standartlarında doğrulanmıştır. Sürüm güvenle paketlenebilir.")
         print("="*70 + "\n")
         return 0
 

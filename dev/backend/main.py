@@ -1,7 +1,12 @@
+import os
+# Telemetri Karantinası: ChromaDB / HF telemetri çökmelerini engelle
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+os.environ["CHROMA_TELEMETRY"] = "False"
+os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import os
 import fitz  # PyMuPDF
 import model_factory
 from langchain_core.prompts import PromptTemplate

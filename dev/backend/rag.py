@@ -2,6 +2,11 @@ import os
 import ssl
 import urllib3
 
+# 1. Telemetri Karantinası: Paketleme sonrası PostHog / ChromaDB telemetri çökmelerini engelle
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+os.environ["CHROMA_TELEMETRY"] = "False"
+os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+
 try:
     ssl._create_default_https_context = ssl._create_unverified_context
 except Exception:
@@ -9,6 +14,7 @@ except Exception:
 urllib3.disable_warnings()
 
 import pymupdf as fitz
+from chromadb.config import Settings as ChromaSettings
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter

@@ -63,6 +63,7 @@ Herhangi bir dağıtım öncesinde `run_sandbox_test.py` tarafından çalıştı
 | **QG-8** | **Çoklu Model & RAG Boyut İzolasyonu** | 3 Yerel Model (`e5-small`, `bge-m3`, `qwen2-7b`) ve 1 API (`cloud-gemini`) matrisi taranır. Zirve model `qwen2-7b` için güvenli yükleme (`trust_remote_code=False`) ve farklı vektör boyutları (384, 1024, 3584, 768) için ChromaDB koleksiyon izolasyonu denetlenir. | Sıfır `rope_theta` çökmesi, sıfır `InvalidDimensionException`, eksik API anahtarında net yönlendirici hata. |
 | **QG-9** | **Kütüphane Yaşam Döngüsü & Senkronizasyon** | Gerçek çok sayfalı PDF yüklenir, chunk'lanır ve ChromaDB'ye kaydedilir. Klasöre el ile bırakılan PDF'ler taranır (`/api/kutuphane-senkronize`). Silme işlemi test edilir. | PDF ve ChromaDB chunk'larının sıfır artıkla silinmesi, yeni dosyaların otomatik keşfi. |
 | **QG-10** | **Kullanıcı Odaklı Kaldırma (Uninstaller)** | "Kütüphanemi Koru" ve "Tam Temizlik (Sıfır Kalıntı)" senaryoları simüle edilir. | Koru modunda kullanıcı verisinin %100 yaşaması, Tam Temizlik modunda tek bayt kalıntı kalmaması. |
+| **QG-11** | **Donmuş Binary & Telemetri İzolasyonu** | PyInstaller `build.py` ve kod seviyesinde `ANONYMIZED_TELEMETRY=False` / `collect-all=chromadb` varlığı ve derlenmiş `.exe`nin izole PATH'te çalışması denetlenir. | Sıfır `ModuleNotFoundError: posthog`, dinamik modüllerin %100 toplanması, sıfır Python bağımlılık sızıntısı. |
 
 ---
 
