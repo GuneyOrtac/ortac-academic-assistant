@@ -62,7 +62,9 @@ Yazılım geliştirme sürecinin kobaysız, hatasız ve kısır döngüsüz yür
 2. [x] **Electron UI Başsız Duman Testi (Headless Smoke Test):** `tools/electron_smoke_test.js` geliştirildi ve çalıştırıldı -> React DOM Mount, IPC Preload Bridge ve Renderer stabilitesi **100% PASS**.
 3. [x] **Kullanıcı Odaklı Kaldırma (Uninstaller) Mimarisi:** NSIS `uninstaller.nsh` ve `tools/uninstaller_cleanup.py` entegre edildi. Kullanıcıya [EVET] Kütüphanemi Koru / [HAYIR] Tam Temizlik seçenekleri sağlandı.
 4. [x] **Ayarlar Sekmesi Model Seçicisi & Güvenli Birleştirme:** `SettingsTab.tsx` içine 4 model profilinin (3 Yerel + 1 Bulut) görsel kartları eklendi. `model_factory.save_settings` mevcut ayarları ezmeden birleştirecek şekilde güçlendirildi.
-5. [x] **v0.0.4 Masaüstü Paketleri & Üretim Dağıtımı:**
-   - PyInstaller ile backend executable derlendi.
-   - `ORTAC.Akademik.Asistan.Setup.0.0.4.exe` (310 MB) ve `Akademik Asistan-0.0.4-win.zip` (392 MB) üretildi.
-   - Kullanıcının `F:\AkademikAsistan\resources` hedefindeki kurulu uygulaması verilerine (`F:\AkademikAsistan\veri`) tek bir bayt zarar vermeden v0.0.4'e sıcak yamalandı.
+5. [x] **v0.0.4 Masaüstü Paketleri:** Yayınlandı ve GitHub'a yüklendi.
+6. [x] **v0.0.5 ChromaDB & Gerçek Ortam Simülasyonu (Clean-Room Frozen Executable):**
+   - **Hata Tespiti:** Kullanıcının kütüphaneye PDF eklerken karşılaştığı `No module named 'chromadb.telemetry.product.posthog'` hatası incelendi.
+   - **Kök Neden Çözümü:** `ANONYMIZED_TELEMETRY=False` ve `CHROMA_TELEMETRY=False` kilitleri yerleştirildi; `dev/backend/build.py` PyInstaller `--onedir` moduna geçirildi (`--collect-all=chromadb` ile tüm dinamik telemetri ve segment bileşenleri pakete gömüldü).
+   - **İzole Gerçek Ortam Simülasyon Testi (`tools/test_frozen_backend_e2e.py`):** Ortam `PATH`'inden Python, venv ve Node silinerek bağımsız bir Windows prosesi olarak donmuş `AkademikAsistan_Backend.exe` çalıştırıldı; sıfır kalıntılı geçici sandbox dizininde gerçek PDF yüklendi, chunklandı, vektörleştirildi ve arama yapıldı. **%100 PASS**.
+   - **Paketleme & Dağıtım:** `ORTAC.Akademik.Asistan.Setup.0.0.5.exe` ve `Akademik Asistan-0.0.5-win.zip` derlendi ve GitHub Releases'a yayınlandı.
