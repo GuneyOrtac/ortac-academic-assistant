@@ -127,6 +127,33 @@ export default function SettingsTab() {
     }
   };
 
+  const handleLaunchInstaller = async () => {
+    try {
+      setUpdateMsg('Kurulum sihirbazı penceresi başlatılıyor...');
+      const res = await fetch('http://127.0.0.1:8000/api/guncelleme-calistir', { method: 'POST' });
+      const data = await res.json();
+      if (data.durum === 'basarili') {
+        setUpdateMsg('✓ ' + (data.mesaj || 'Kurulum sihirbazı penceresi açıldı. Lütfen adımları takip edin.'));
+      } else {
+        setUpdateMsg('Uyarı: ' + (data.mesaj || 'Kurulum başlatılamadı.'));
+      }
+    } catch (e: any) {
+      setUpdateMsg('Bağlantı hatası: ' + e.message);
+    }
+  };
+
+  const handleOpenInstallerFolder = async () => {
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/guncelleme-klasor-ac', { method: 'POST' });
+      const data = await res.json();
+      if (data.durum === 'basarili') {
+        setUpdateMsg('✓ İndirilen kurulum dosyasının klasörü açıldı.');
+      }
+    } catch (e: any) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetch('http://127.0.0.1:8000/api/ayarlar')
       .then(res => res.json())
@@ -556,21 +583,29 @@ export default function SettingsTab() {
           )}
 
           {updateProgress && updateProgress.status === 'completed' && (
-            <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '12px 16px' }}>
+            <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '14px 16px' }}>
               <div>
                 <span style={{ color: '#34d399', fontSize: '13px', fontWeight: 600, display: 'block' }}>
                   ✓ Güncelleme Paketi Başarıyla İndirildi ({updateProgress.total_mb} MB)
                 </span>
-                <span style={{ color: '#cbd5e1', fontSize: '12px' }}>
-                  Kurulum sihirbazı otomatik olarak başlatıldı. Kurulum sihirbazını takip ederek güncellemeyi bitirebilirsiniz.
+                <span style={{ color: '#cbd5e1', fontSize: '12px', marginTop: '2px', display: 'block' }}>
+                  Kurulum sihirbazı penceresi arka planda çağrıldı. Açılmadıysa aşağıdaki butonları kullanarak kurulumu hemen başlatabilir veya dosyayı klasörde görüntüleyebilirsiniz.
                 </span>
               </div>
-              <button
-                onClick={async () => { await fetch('http://127.0.0.1:8000/api/guncelleme-calistir', { method: 'POST' }); }}
-                style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '4px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
-              >
-                Kurulum Penceresini Aç
-              </button>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button
+                  onClick={handleLaunchInstaller}
+                  style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  🚀 Kurulum Penceresini Aç
+                </button>
+                <button
+                  onClick={handleOpenInstallerFolder}
+                  style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.2)', padding: '8px 14px', borderRadius: '4px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  📁 Klasörde Göster
+                </button>
+              </div>
             </div>
           )}
 

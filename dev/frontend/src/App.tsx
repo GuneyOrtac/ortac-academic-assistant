@@ -501,7 +501,7 @@ function App() {
         </div>
         
         <div className="sidebar-footer">
-          <span className="footer-text">Versiyon 0.0.4</span>
+          <span className="footer-text">Versiyon {appUpdateInfo?.mevcut_surum || "0.0.5"}</span>
           <span className="footer-name">Dr. Güney ORTAÇ</span>
           <span className="footer-text">© Tüm Hakları Saklıdır</span>
         </div>
@@ -543,7 +543,7 @@ function App() {
               </span>
             ) : (
               <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
-                v0.0.4 (Güncel ✓)
+                v{appUpdateInfo?.mevcut_surum || "0.0.5"} (Güncel ✓)
               </span>
             )}
           </div>

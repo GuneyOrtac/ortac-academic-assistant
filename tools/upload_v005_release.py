@@ -106,12 +106,22 @@ def upload_asset(upload_url_template, file_path, token):
     if res.status_code == 201:
         print(f"   ✓ {file_name} başarıyla yüklendi!")
         return True
-    elif res.status_code == 422:
-        print(f"   ℹ {file_name} zaten mevcut veya daha önce yüklenmiş.")
-        return True
     else:
         print(f"   [-] Yükleme hatası ({res.status_code}): {res.text}")
         return False
+
+def delete_existing_asset(repo, asset_id, token):
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "ORTAC-Academic-Assistant-Publisher"
+    }
+    url = f"https://api.github.com/repos/{repo}/releases/assets/{asset_id}"
+    res = requests.delete(url, headers=headers)
+    if res.status_code in [204, 200]:
+        print(f"   [x] Eski varlık (ID: {asset_id}) GitHub'dan başarıyla silindi.")
+        return True
+    return False
 
 def main():
     repo = "GuneyOrtac/ortac-academic-assistant"
@@ -129,6 +139,14 @@ def main():
     release = create_or_get_release(repo, tag, token)
     upload_url = release.get("upload_url")
     
+    # Mevcut release içindeki eski asset'leri temizle (üzerine taze paket yazılabilmesi için)
+    existing_assets = release.get("assets", [])
+    if existing_assets:
+        print(f"[*] Mevcut {len(existing_assets)} adet varlık tespit edildi. Eski derlemeler temizleniyor...")
+        for a in existing_assets:
+            print(f"   -> Siliniyor: {a['name']} (ID: {a['id']})")
+            delete_existing_asset(repo, a['id'], token)
+
     releases_dir = Path("product/adim-8/releases")
     setup_exe = releases_dir / "ORTAC.Akademik.Asistan.Setup.0.0.5.exe"
     portable_zip = releases_dir / "Akademik Asistan-0.0.5-win.zip"

@@ -708,13 +708,15 @@ def _download_and_launch_installer(setup_url: str, version: str):
         update_state["percent"] = 100
         update_state["status"] = "completed"
 
-        # Windows üzerinde kurulum dosyasını doğrudan çalıştır
+        # Windows üzerinde kurulum dosyasını doğrudan ve öne çıkacak şekilde çalıştır
         try:
-            if hasattr(os, "startfile"):
-                os.startfile(local_filename)
-            else:
-                subprocess.Popen([local_filename], shell=True)
+            subprocess.Popen(["cmd.exe", "/c", "start", "", local_filename], shell=False)
         except Exception as launch_err:
+            try:
+                if hasattr(os, "startfile"):
+                    os.startfile(local_filename)
+            except Exception:
+                pass
             print(f"Kurulum başlatma uyarısı: {launch_err}")
     except Exception as e:
         update_state["status"] = "error"
@@ -730,16 +732,52 @@ async def launch_downloaded_installer():
     """İndirilmiş kurulum dosyasını manuel başlatır."""
     global update_state
     fpath = update_state.get("file_path")
+    
+    # Bellekte yoksa TEMP dizininde ara
+    if not fpath or not os.path.exists(fpath):
+        import glob
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        matches = glob.glob(os.path.join(temp_dir, "ORTAC*Setup*.exe"))
+        if matches:
+            matches.sort(key=os.path.getmtime, reverse=True)
+            fpath = matches[0]
+            update_state["file_path"] = fpath
+            
     if fpath and os.path.exists(fpath):
         try:
-            if hasattr(os, "startfile"):
-                os.startfile(fpath)
-            else:
-                subprocess.Popen([fpath], shell=True)
-            return {"durum": "basarili", "mesaj": "Kurulum sihirbazı başlatıldı."}
+            subprocess.Popen(["cmd.exe", "/c", "start", "", fpath], shell=False)
+            return {"durum": "basarili", "mesaj": "Kurulum sihirbazı penceresi açıldı.", "dosya": fpath}
         except Exception as e:
-            return {"durum": "hata", "mesaj": f"Kurulum başlatılamadı: {e}"}
-    return {"durum": "hata", "mesaj": "İndirilmiş kurulum dosyası bulunamadı."}
+            try:
+                if hasattr(os, "startfile"):
+                    os.startfile(fpath)
+                    return {"durum": "basarili", "mesaj": "Kurulum sihirbazı başlatıldı.", "dosya": fpath}
+            except Exception:
+                pass
+            return {"durum": "hata", "mesaj": f"Kurulum başlatılamadı: {e}", "dosya": fpath}
+    return {"durum": "hata", "mesaj": "İndirilmiş kurulum dosyası bulunamadı. Lütfen 'İndir & Kur' butonuna tekrar tıklayın."}
+
+@app.post("/api/guncelleme-klasor-ac")
+async def open_downloaded_installer_folder():
+    """İndirilmiş kurulum dosyasının bulunduğu klasörü Dosya Gezgini'nde açar ve dosyayı seçer."""
+    global update_state
+    fpath = update_state.get("file_path")
+    if not fpath or not os.path.exists(fpath):
+        import glob
+        import tempfile
+        matches = glob.glob(os.path.join(tempfile.gettempdir(), "ORTAC*Setup*.exe"))
+        if matches:
+            matches.sort(key=os.path.getmtime, reverse=True)
+            fpath = matches[0]
+            
+    if fpath and os.path.exists(fpath):
+        try:
+            subprocess.Popen(["explorer.exe", f"/select,{os.path.normpath(fpath)}"])
+            return {"durum": "basarili", "mesaj": "Klasör açıldı.", "dosya": fpath}
+        except Exception as e:
+            return {"durum": "hata", "mesaj": f"Klasör açılamadı: {e}"}
+    return {"durum": "hata", "mesaj": "Kurulum dosyası bulunamadı."}
 
 @app.post("/api/guncelleme-uygula")
 async def apply_github_update():

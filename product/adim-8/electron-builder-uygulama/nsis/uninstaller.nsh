@@ -1,8 +1,15 @@
 ; ==============================================================================
-; ORTAC Akademik Asistan - Kullanıcı Odaklı NSIS Kaldırma Sihirbazı (Uninstaller)
+; ORTAC Akademik Asistan - Kullanıcı Odaklı NSIS Kaldırma ve Kurulum Sihirbazı
 ; ==============================================================================
 
 !include "LogicLib.nsh"
+
+!macro customInit
+    ; Kurulum veya güncelleme esnasında çalışan eski süreçleri sonlandır ki dosyalar kilitlenmesin
+    nsExec::Exec 'taskkill /F /IM backend-server.exe /T'
+    nsExec::Exec 'taskkill /F /IM AkademikAsistan_Backend.exe /T'
+    nsExec::Exec 'taskkill /F /IM "Akademik Asistan.exe" /T'
+!macroend
 
 !macro customUnInit
     ; 1. Arka planda açık kalan backend ve uygulama süreçlerini güvenle sonlandır

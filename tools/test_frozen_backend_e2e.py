@@ -113,6 +113,19 @@ def run_frozen_simulation():
 
         print("   -> [PASS] Backend derlenmiş .exe üzerinde başarıyla ayağa kalktı ve API yanıt veriyor!")
 
+        # 4.5. Sürüm Doğrulama (v0.0.5 kesin kontrolü)
+        v_res = requests.get(f"http://127.0.0.1:{test_port}/api/guncelleme-kontrol", timeout=5)
+        if v_res.status_code == 200:
+            v_data = v_res.json()
+            cur_ver = v_data.get("mevcut_surum")
+            print(f"   -> [PASS] Donmuş Backend Sürüm Doğrulaması: v{cur_ver}")
+            if cur_ver != "0.0.5":
+                print(f"[!] KRİTİK HATA: Beklenen sürüm 0.0.5 iken derlenmiş ikiliden v{cur_ver} döndü!")
+                return 1
+        else:
+            print(f"[!] HATA: /api/guncelleme-kontrol yanıt vermedi! HTTP {v_res.status_code}")
+            return 1
+
         # 5. Gerçek Test PDF'i Oluştur
         print("\n[*] [3/5] Test akademik makale PDF'i üretiliyor...")
         test_pdf_path = temp_sandbox / "Jeotermal_Enerji_Makalesi.pdf"
