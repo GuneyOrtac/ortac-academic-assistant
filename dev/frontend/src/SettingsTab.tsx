@@ -437,6 +437,46 @@ export default function SettingsTab() {
               </div>
             </div>
           )}
+
+          {/* Aktif Vektörleştirme (Embedding) Modeli Seçimi */}
+          <div style={{ marginTop: '4px', padding: '14px', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
+                🧠 Vektörleştirme (RAG Embedding) Modeli Tercihi:
+              </span>
+              <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                Değişikliklerin kaydedilmesi için yukarıdaki "Kaydet" butonuna basınız.
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
+              {[
+                { id: 'bge-m3', name: 'BAAI/bge-m3 (Önerilen)', desc: '1024 Boyut • Hibrit Tarama (8.192 Sözcük)' },
+                { id: 'qwen2-7b', name: 'gte-Qwen2-7B (Zirve Güç)', desc: '3584 Boyut • 32.768 Bağlam (En Yüksek Başarım)' },
+                { id: 'e5-small', name: 'multilingual-e5-small', desc: '384 Boyut • Ultra Hızlı & Düşük RAM' },
+                { id: 'cloud-gemini', name: 'Google Bulut API Modu', desc: '768 Boyut • Sıfır Donanım Yükü (Gemini Key ile)' }
+              ].map(profile => (
+                <div
+                  key={profile.id}
+                  onClick={() => setSettings({ ...settings, embedding_profile: profile.id })}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    background: (settings.embedding_profile || 'bge-m3') === profile.id ? 'rgba(59,130,246,0.15)' : '#18181b',
+                    border: (settings.embedding_profile || 'bge-m3') === profile.id ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.06)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: (settings.embedding_profile || 'bge-m3') === profile.id ? '#60a5fa' : '#e4e4e7' }}>
+                    {profile.name}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                    {profile.desc}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* GitHub Otomatik Güncelleme ve Sürüm Kontrolü */}

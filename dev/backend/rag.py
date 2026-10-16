@@ -40,6 +40,15 @@ def get_chroma_dir():
     os.makedirs(d, exist_ok=True)
     return d
 
+def get_collection_name() -> str:
+    """Aktif embedding profiline göre izole koleksiyon adı döner.
+    Böylece bge-m3 (1024), qwen2-7b (3584), e5-small (384) ve cloud-gemini (768) gibi
+    farklı boyutlardaki modeller aynı ChromaDB veritabanında birbirini bozmaz.
+    """
+    settings = model_factory.get_settings()
+    profile_key = settings.get("embedding_profile", "bge-m3").replace("-", "_")
+    return f"{COLLECTION_NAME}_{profile_key}"
+
 def get_embeddings():
     """Seçili modele göre embedding nesnesini döner (Singleton). Modeller doğrudan hedef sürücüye indirilir."""
     global _embeddings
@@ -52,6 +61,11 @@ def get_embeddings():
         if profile_key == "cloud-gemini":
             from langchain_google_genai import GoogleGenerativeAIEmbeddings
             api_key = model_factory.get_gemini_api_key()
+            if not api_key or api_key == "bekleniyor" or api_key.startswith("AQ.Ab8") or len(api_key) < 10:
+                raise ValueError(
+                    "Google Bulut API Modu (cloud-gemini) için geçerli bir Gemini API anahtarı gereklidir. "
+                    "Yerel ve çevrimdışı model çalıştırmak için Ayarlar'dan 'bge-m3', 'qwen2-7b' veya 'e5-small' seçiniz."
+                )
             _embeddings = GoogleGenerativeAIEmbeddings(
                 model="models/text-embedding-004",
                 google_api_key=api_key
@@ -65,29 +79,45 @@ def get_embeddings():
             os.environ["TRANSFORMERS_CACHE"] = hf_cache_dir
             os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
             
+            # Güvenli model parametreleri:
+            # Qwen2 ve benzeri modern modellerde harici modeling_qwen.py yerine
+            # transformers'ın yerel native Qwen2 sınıfını kullanmak için trust_remote_code=False olmalıdır.
+            model_kwargs = {"trust_remote_code": False}
+            user_hf_cache = os.path.expanduser("~/.cache/huggingface/hub")
+            
+            # 1. Öncelik: Hedef sürücüdeki yerel önbellek
             try:
-                # Önce çevrimdışı / önceden inmiş yerel kopyayı dene
                 _embeddings = HuggingFaceEmbeddings(
                     model_name=model_name,
                     cache_folder=hf_cache_dir,
-                    model_kwargs={"local_files_only": True}
+                    model_kwargs={**model_kwargs, "local_files_only": True}
                 )
             except Exception:
-                # İndirilmemişse hedef sürücüdeki klasöre indir
-                _embeddings = HuggingFaceEmbeddings(
-                    model_name=model_name,
-                    cache_folder=hf_cache_dir
-                )
+                # 2. İkincil Öncelik: Kullanıcının genel HuggingFace önbelleği (~/.cache/huggingface/hub)
+                try:
+                    _embeddings = HuggingFaceEmbeddings(
+                        model_name=model_name,
+                        cache_folder=user_hf_cache,
+                        model_kwargs={**model_kwargs, "local_files_only": True}
+                    )
+                except Exception:
+                    # 3. İndirilmemişse hedef sürücüdeki klasöre indir
+                    _embeddings = HuggingFaceEmbeddings(
+                        model_name=model_name,
+                        cache_folder=hf_cache_dir,
+                        model_kwargs=model_kwargs
+                    )
     return _embeddings
 
 def get_vectorstore():
-    """ChromaDB veritabanı bağlantısını döndürür (Singleton)."""
+    """ChromaDB veritabanı bağlantısını döndürür (Singleton). Modele göre izole koleksiyon kullanır."""
     global _vectorstore
     if _vectorstore is None:
         chroma_dir = get_chroma_dir()
         os.makedirs(chroma_dir, exist_ok=True)
+        col_name = get_collection_name()
         _vectorstore = Chroma(
-            collection_name=COLLECTION_NAME,
+            collection_name=col_name,
             embedding_function=get_embeddings(),
             persist_directory=chroma_dir
         )

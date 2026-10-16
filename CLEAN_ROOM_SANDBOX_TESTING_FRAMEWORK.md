@@ -60,6 +60,9 @@ Herhangi bir dağıtım öncesinde `run_sandbox_test.py` tarafından çalıştı
 | **QG-5** | **Semantik Geri Çağırma (Retrieval)** | Doğal dilde soru yöneltilir (`/api/ara`). Vektör benzerlik araması koşturulur. | En yüksek benzerliğe sahip en az 2 chunk'ın getirilmesi. |
 | **QG-6** | **Yapay Zekâ ve RAG Sentezi** | LLM motoruna (`gemini-3.5-flash` / Yerel Model) RAG bağlamıyla prompt gönderilir. | Yanıtın 200 OK ile dönmesi, kaynak künyesi referansının bulunması. |
 | **QG-7** | **Uygulama İçi Canlı Güncelleme** | Sahte bir sürüm bildirilerek indirme endpoint'i (`/api/guncelleme-calistir`) test edilir. | Tarayıcı açılmadan arka planda inmesi ve `os.startfile` tespiti. |
+| **QG-8** | **Çoklu Model & RAG Boyut İzolasyonu** | 3 Yerel Model (`e5-small`, `bge-m3`, `qwen2-7b`) ve 1 API (`cloud-gemini`) matrisi taranır. Zirve model `qwen2-7b` için güvenli yükleme (`trust_remote_code=False`) ve farklı vektör boyutları (384, 1024, 3584, 768) için ChromaDB koleksiyon izolasyonu denetlenir. | Sıfır `rope_theta` çökmesi, sıfır `InvalidDimensionException`, eksik API anahtarında net yönlendirici hata. |
+| **QG-9** | **Kütüphane Yaşam Döngüsü & Senkronizasyon** | Gerçek çok sayfalı PDF yüklenir, chunk'lanır ve ChromaDB'ye kaydedilir. Klasöre el ile bırakılan PDF'ler taranır (`/api/kutuphane-senkronize`). Silme işlemi test edilir. | PDF ve ChromaDB chunk'larının sıfır artıkla silinmesi, yeni dosyaların otomatik keşfi. |
+| **QG-10** | **Kullanıcı Odaklı Kaldırma (Uninstaller)** | "Kütüphanemi Koru" ve "Tam Temizlik (Sıfır Kalıntı)" senaryoları simüle edilir. | Koru modunda kullanıcı verisinin %100 yaşaması, Tam Temizlik modunda tek bayt kalıntı kalmaması. |
 
 ---
 

@@ -5,6 +5,28 @@ Her yeni karar en üste eklenir (yeni → eski).
 
 ---
 
+## Karar: Kullanıcı Odaklı & Sıfır Kalıntılı Kaldırma Mimarisi (Ekim 2026)
+**Karar:** 
+1. **İki Seçenekli Karar Penceresi:** Kullanıcı programı kaldırmak istediğinde NSIS üzerinden nazik bir karar kartı sunulur:
+   - *[EVET] Kütüphanemi ve Vektörlerimi Koru (Önerilen):* Sadece program binary'leri ve geçici önbellekler silinir; kullanıcının PDF arşivi ve ChromaDB veritabanı `{HedefSürücü}\AkademikAsistan\veri` altında güvenle saklanır.
+   - *[HAYIR] Tam Temizlik (Sıfır Kalıntı):* Program, kütüphane, ChromaDB, HF modelleri, `%APPDATA%`, registry ve kısayollar tek bayt kalmayacak şekilde tamamen yok edilir.
+2. **Süreç Kapatma Otomasyonu:** Kaldırma sihirbazı başlatıldığında açık olan `backend-server.exe` ve `akademik-asistan.exe` süreçleri `customUnInit` ile otomatik sonlandırılır.
+3. **Temiz Oda QG-10 Doğrulaması:** Her iki senaryonun da disk üzerindeki davranışı otomatik temiz oda test matrisine (`tools/run_sandbox_test.py`) bağlanmıştır.
+
+---
+
+## Karar: Çoklu Model RAG Boyut İzolasyonu & Qwen2-7B Güvenli Yükleme (Ekim 2026)
+**Karar:** 
+1. **ChromaDB Boyut İzolasyonu:** Farklı vektör boyutlarına sahip modeller (`bge-m3`: 1024, `qwen2-7b`: 3584, `e5-small`: 384, `cloud-gemini`: 768) için dinamik `makale_kutuphanesi_{profil}` koleksiyon adı zorunlu kılındı.
+2. **Qwen2-7B Güvenli Çalışma Parametresi:** HuggingFace `gte-Qwen2-7B-instruct` modeli çağrılırken `trust_remote_code=False` standardı getirildi.
+3. **Çift Önbellek Taraması:** Modeller önce hedef sürücüdeki `veri/modeller/hf` dizininde, bulunamazsa kullanıcının sistem önbelleğinde (`~/.cache/huggingface/hub`) aranarak 28 GB'lık mükerrer indirmeler engellendi.
+4. **Cloud-Gemini API Koruması:** `cloud-gemini`'nin yerel bir model olmadığı, Google API anahtarı gerektirdiği kontrol altına alındı; anahtar yoksa veya çevrimdışıysa kullanıcıya yerel modelleri seçmesi yönünde net rehberlik verildi.
+**Gerekçe:** 
+- `gte-Qwen2-7B-instruct` uzaktan kod çalıştırmada eski transformers'a dayalı `modeling_qwen.py` indirdiği için `'Qwen2Config' object has no attribute 'rope_theta'` hatası veriyordu. `trust_remote_code=False` ile transformers'ın yerel `Qwen2Model` motoru hatasız devreye girer.
+- Tek bir koleksiyon adı kullanıldığında model değiştiren kullanıcı `InvalidDimensionException` ile karşılaşıyor ve RAG kütüphanesi çöküyordu.
+
+---
+
 ## Karar: Temiz Oda Sanal Test İstasyonu & Devre Kesici (Clean-Room & HITL) (Ekim 2026)
 **Karar:** Kodlar asla kullanıcının bilgisayarı üzerinde kobay olarak test edilmeyecek. Dağıtım öncesi geçici bir sanal alanda 7 Kalite Kapısı (`tools/run_sandbox_test.py`) çalıştırılacak.
 **Gerekçe:** Kullanıcı sisteminde kalıntı bırakmamak, bozuk sürümlerin GitHub'a gitmesini engellemek ve yapay zekânın kısır döngüye girmesini (infinite loop) önlemek.

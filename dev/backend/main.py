@@ -7,6 +7,7 @@ import model_factory
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
 from fastapi.responses import FileResponse
 import rag
 import chat_engine
@@ -20,7 +21,7 @@ load_dotenv()
 app = FastAPI(
     title="Akademik Asistan API",
     description="Yapay Zeka Destekli Masaüstü Akademik Asistan Backend Motoru",
-    version="0.0.3"
+    version="0.0.4"
 )
 
 app.add_middleware(
@@ -393,8 +394,13 @@ async def list_mcp_tools():
 
 # --- Ayarlar (Settings) ---
 class SettingsUpdate(BaseModel):
-    api_keys: dict
-    models: dict
+    api_keys: Optional[Dict[str, Any]] = None
+    models: Optional[Dict[str, Any]] = None
+    embedding_profile: Optional[str] = None
+    api_mode: Optional[str] = None
+
+    class Config:
+        extra = "allow"
 
 @app.get("/api/ayarlar")
 async def read_settings():
@@ -402,7 +408,9 @@ async def read_settings():
 
 @app.post("/api/ayarlar")
 async def update_settings(settings: SettingsUpdate):
-    model_factory.save_settings(settings.dict())
+    payload = settings.dict(exclude_unset=True)
+    model_factory.save_settings(payload)
+    rag.reset_rag_engine()
     return {"mesaj": "Ayarlar başarıyla kaydedildi"}
 
 # --- Kurulum ve Sistem Bilgisi (Onboarding & Hardware Diagnostic) ---
@@ -595,7 +603,7 @@ async def reset_onboarding():
     return {"mesaj": "Kurulum durumu sıfırlandı."}
 
 GITHUB_REPO = "GuneyOrtac/ortac-academic-assistant"
-CURRENT_VERSION = "0.0.3"
+CURRENT_VERSION = "0.0.4"
 
 @app.get("/api/guncelleme-kontrol")
 async def check_github_update():

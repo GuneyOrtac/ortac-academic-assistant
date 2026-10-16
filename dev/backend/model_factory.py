@@ -34,10 +34,11 @@ def get_app_root() -> str:
 
 def get_data_dir() -> str:
     """Uygulamanın aktif 'veri' klasörünü döner. Tüm veritabanı, kütüphane ve modeller burada saklanır."""
-    if os.environ.get("AKADEMIK_ASISTAN_DATA"):
-        d = os.path.abspath(os.environ["AKADEMIK_ASISTAN_DATA"])
-        os.makedirs(d, exist_ok=True)
-        return d
+    for env_key in ["AKADEMIK_ASISTAN_DATA", "AKADEMIK_DATA_DIR"]:
+        if os.environ.get(env_key):
+            d = os.path.abspath(os.environ[env_key])
+            os.makedirs(d, exist_ok=True)
+            return d
     
     # Kurulum kökündeki 'veri' klasörü (örn. F:\AkademikAsistan\veri)
     root = get_app_root()
@@ -245,22 +246,24 @@ def update_env_file(key_name: str, key_val: str):
 
 def save_settings(settings_data: dict):
     """Ayarları hem aktif veri/settings.json dosyasına hem de yerel kopyaya kaydeder."""
+    current = get_settings()
+    current.update(settings_data)
     target_file = get_settings_file_path()
     os.makedirs(os.path.dirname(target_file), exist_ok=True)
     with open(target_file, "w", encoding="utf-8") as f:
-        json.dump(settings_data, f, ensure_ascii=False, indent=4)
+        json.dump(current, f, ensure_ascii=False, indent=4)
         
     try:
         local_veri_dir = os.path.join(os.getcwd(), "veri")
         if os.path.exists(local_veri_dir) and os.path.abspath(local_veri_dir) != os.path.abspath(os.path.dirname(target_file)):
             local_target = os.path.join(local_veri_dir, "settings.json")
             with open(local_target, "w", encoding="utf-8") as f:
-                json.dump(settings_data, f, ensure_ascii=False, indent=4)
+                json.dump(current, f, ensure_ascii=False, indent=4)
     except Exception:
         pass
 
     # Bellekteki çevre değişkenlerini anlık güncelle
-    gemini_key = settings_data.get("api_keys", {}).get("gemini", "").strip()
+    gemini_key = current.get("api_keys", {}).get("gemini", "").strip()
     if gemini_key:
         os.environ["GEMINI_API_KEY"] = gemini_key
         os.environ["GOOGLE_API_KEY"] = gemini_key
@@ -277,9 +280,9 @@ def get_gemini_api_key() -> str:
     return key
 
 def is_gemini_configured() -> bool:
-    """Gemini API anahtarının tanımlı olup olmadığını döner."""
+    """Gemini API anahtarının tanımlı ve geçerli formatta olup olmadığını döner."""
     key = get_gemini_api_key()
-    return bool(key and key != "bekleniyor" and len(key) > 5)
+    return bool(key and key != "bekleniyor" and not key.startswith("AQ.Ab8") and len(key) > 15)
 
 def get_gemini_llm(task: str = "chat", model_override: str = None, temperature: float = None):
     """

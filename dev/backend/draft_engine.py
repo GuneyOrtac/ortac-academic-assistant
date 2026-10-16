@@ -17,6 +17,8 @@ class DraftResponse(BaseModel):
 
 def taslak_ve_word_olustur(konu: str, taslak_yolu: str = "makale_taslagi.docx") -> dict:
     """Verilen konuya göre makale taslağı (OpenDraft) oluşturup eksik atıfları sarıya boyayarak Word'e kaydeder."""
+    if not model_factory.is_gemini_configured():
+        raise ValueError("Makale taslağı oluşturmak için geçerli bir Google Gemini API anahtarı gereklidir. Lütfen 'Ayarlar' sekmesinden API anahtarınızı (AIzaSy...) kaydediniz.")
     llm = model_factory.get_gemini_llm(task="drafting")
     parser = JsonOutputParser(pydantic_object=DraftResponse)
     

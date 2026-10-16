@@ -7,6 +7,11 @@ import rag
 
 def sohbet_yanitla(soru: str, secili_pdfler: list = None, aktif_sekme: str = "Bilinmiyor", draft_icerik: str = "") -> dict:
     """Soruyu sadece veritabanındaki PDF'leri kullanarak cevaplar. Ayrıca taslak editörüne de müdahale edebilir."""
+    if not model_factory.is_gemini_configured():
+        return {
+            "yanit": "[BİLGİ] Sohbet ve makale analizi için geçerli bir Google Gemini API anahtarı gereklidir. Lütfen sağ üstteki 'Ayarlar' sekmesine giderek API anahtarınızı (AIzaSy...) kaydediniz.",
+            "kaynaklar": []
+        }
     llm = model_factory.get_gemini_llm(task="chat")
     
     # 1. RAG ile benzer dökümanları getir

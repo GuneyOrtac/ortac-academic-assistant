@@ -57,12 +57,13 @@
 
 ---
 
-## 🚧 Devam Eden & Yarınki Öncelikler
+## 🚧 Tamamlanan Son Öncelikler (v0.0.4)
 
-- [ ] **Kullanıcı Hedef Sürücüsünde Uçtan Uca Doğrulama:** `F:\AkademikAsistan\veri` hedef dizininde tam döngü testi.
-- [ ] **Görsel & Arayüz Duman Testi (Headless UI Smoke Test):** Electron arayüzünün konsol hatasız açıldığının otomasyonu.
-- [ ] **Delta (Sıcak Yama) Güncellemesi:** 455 MB yerine 2 MB ZIP ile hızlı yama mekanizması.
-- [ ] **v0.0.4 Kararlı Üretim Sürümü:** Temiz oda testlerinden tam not alan yeni sürümün dağıtımı.
+- [x] **Temiz Oda 10 Kalite Kapısı Testi:** Multi-model izolasyonu, kütüphane döngüsü ve uninstaller simülasyonu dahil %100 PASS.
+- [x] **Görsel & Arayüz Duman Testi (Headless UI Smoke Test):** `tools/electron_smoke_test.js` ile React DOM Mount ve IPC doğrulaması tam not aldı.
+- [x] **Kullanıcı Odaklı Uninstaller Mimarisi:** NSIS scripti ve Python temizleme motoruyla kullanıcı verisini koruma / tam temizlik opsiyonu sağlandı.
+- [x] **Kullanıcı Hedef Sürücüsünde Uçtan Uca Doğrulama & Güncelleme:** `F:\AkademikAsistan\veri` hedef dizinindeki kullanıcı verileri korunarak `resources` v0.0.4'e sıcak yamalandı.
+- [x] **v0.0.4 Kararlı Üretim Sürümü:** `ORTAC.Akademik.Asistan.Setup.0.0.4.exe` ve `Akademik Asistan-0.0.4-win.zip` başarıyla paketlendi.
 
 ---
 
