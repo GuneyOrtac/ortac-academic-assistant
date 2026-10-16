@@ -67,4 +67,10 @@ Yazılım geliştirme sürecinin kobaysız, hatasız ve kısır döngüsüz yür
    - **Hata Tespiti:** Kullanıcının kütüphaneye PDF eklerken karşılaştığı `No module named 'chromadb.telemetry.product.posthog'` hatası incelendi.
    - **Kök Neden Çözümü:** `ANONYMIZED_TELEMETRY=False` ve `CHROMA_TELEMETRY=False` kilitleri yerleştirildi; `dev/backend/build.py` PyInstaller `--onedir` moduna geçirildi (`--collect-all=chromadb` ile tüm dinamik telemetri ve segment bileşenleri pakete gömüldü).
    - **İzole Gerçek Ortam Simülasyon Testi (`tools/test_frozen_backend_e2e.py`):** Ortam `PATH`'inden Python, venv ve Node silinerek bağımsız bir Windows prosesi olarak donmuş `AkademikAsistan_Backend.exe` çalıştırıldı; sıfır kalıntılı geçici sandbox dizininde gerçek PDF yüklendi, chunklandı, vektörleştirildi ve arama yapıldı. **%100 PASS**.
-   - **Paketleme & Dağıtım:** `ORTAC.Akademik.Asistan.Setup.0.0.5.exe` ve `Akademik Asistan-0.0.5-win.zip` derlendi ve GitHub Releases'a yayınlandı.
+   - **0.0.4 Gözükme & Kurulum Penceresi Teşhis ve Çözümü:**
+     - `App.tsx` içerisindeki sabit (hardcoded) "Versiyon 0.0.4" yazıları dinamik API bağlamına (`appUpdateInfo?.mevcut_surum || "0.0.5"`) dönüştürüldü.
+     - `main.py` sürüm güncellemesi sonrası PyInstaller taze derleme çalıştırılarak backend binary'si `v0.0.5`'e mühürlendi.
+     - NSIS `oneClick: false` yapılandırmasına geçilerek kullanıcının talep ettiği görsel kurulum penceresi (setup wizard) etkinleştirildi.
+     - Kurulum esnasında açık kalan süreçlerin dosya kilitlemesini engellemek için `customInit` makrosu eklendi.
+     - `/api/guncelleme-calistir` Windows Shell `start` motoruyla bağımsız öne çıkan pencere moduna yükseltildi ve `/api/guncelleme-klasor-ac` ile Dosya Gezgini alternatifi sağlandı.
+   - **Paketleme & Dağıtım:** Doğrulanmış `ORTAC.Akademik.Asistan.Setup.0.0.5.exe` (339 MB) ve `Akademik Asistan-0.0.5-win.zip` (430 MB) GitHub Releases'a yüklendi.
