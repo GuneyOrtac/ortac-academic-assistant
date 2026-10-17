@@ -26,7 +26,7 @@ load_dotenv()
 app = FastAPI(
     title="Akademik Asistan API",
     description="Yapay Zeka Destekli Masaüstü Akademik Asistan Backend Motoru",
-    version="0.0.5"
+    version="0.0.6"
 )
 
 app.add_middleware(
@@ -64,11 +64,13 @@ async def check_system():
         db_status = f"Hata: {str(e)}"
         
     gemini_status = "Bağlı" if model_factory.is_gemini_configured() else "Eksik"
+    openrouter_status = "Bağlı" if model_factory.is_openrouter_configured() else "Eksik"
     deepseek_key = os.getenv("DEEPSEEK_API_KEY")
     deepseek_status = "Bağlı" if deepseek_key and deepseek_key != "bekleniyor" else "Eksik"
         
     return {
         "gemini_api": gemini_status,
+        "openrouter_api": openrouter_status,
         "deepseek_api": deepseek_status,
         "veritabani": db_status
     }
@@ -89,9 +91,9 @@ async def upload_pdf(file: UploadFile = File(...)):
         for page_num in range(min(3, len(doc))):
             ilk_sayfalar_metni += doc[page_num].get_text()
             
-        # 3. Gemini ile Künye Çıkarma (Hata durumunda akıllı fallback)
+        # 3. LLM (Gemini / OpenRouter Nex-N2-Pro) ile Künye Çıkarma (Hata durumunda akıllı fallback)
         metadata_sonuc = None
-        if model_factory.is_gemini_configured():
+        if model_factory.is_llm_configured(task="analysis"):
             try:
                 prompt = PromptTemplate(
                     template="""Aşağıdaki akademik belgenin ilk sayfalarından alınan karmaşık metni incele.
@@ -106,7 +108,7 @@ async def upload_pdf(file: UploadFile = File(...)):
                     input_variables=["text"],
                     partial_variables={"format_instructions": parser.get_format_instructions()},
                 )
-                analysis_llm = model_factory.get_gemini_llm(task="analysis")
+                analysis_llm = model_factory.get_llm(task="analysis")
                 chain = prompt | analysis_llm | parser
                 metadata_sonuc = chain.invoke({"text": ilk_sayfalar_metni})
             except Exception as llm_err:
@@ -226,15 +228,47 @@ async def chat_with_docs(request: ChatRequest):
 class DraftRequest(BaseModel):
     konu: str
 
+class DownloadDraftRequest(BaseModel):
+    html_icerik: str
+    baslik: Optional[str] = "Makale Taslağı"
+
+@app.post("/api/taslak-indir")
+async def download_draft_docx(request: DownloadDraftRequest):
+    """Editördeki HTML içeriğini Word (.docx) olarak dönüştürür ve dosyayı indirilebilir olarak sunar."""
+    import tempfile
+    import re
+    try:
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
+        temp_path = temp_file.name
+        temp_file.close()
+        
+        draft_engine.html_to_docx(request.html_icerik, temp_path, default_baslik=request.baslik or "Makale Taslağı")
+        
+        safe_name = re.sub(r'[^\w\-_.]', '_', request.baslik or "Makale_Taslagi").strip('_') or "Makale_Taslagi"
+        return FileResponse(
+            path=temp_path, 
+            filename=f"{safe_name}.docx",
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Word dışa aktarma hatası: {str(e)}")
+
+@app.post("/api/taslak-metin-uret")
+async def generate_draft_text(request: DraftRequest):
+    """Verilen konuda yapay zekâ ile zengin HTML taslak metni üretir."""
+    try:
+        sonuc = draft_engine.taslak_metin_uret(request.konu)
+        return sonuc
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Taslak üretim hatası: {str(e)}")
+
 @app.post("/api/taslak-olustur")
 async def generate_draft(request: DraftRequest):
     """Verilen konuda makale taslağı oluşturur ve Word (.docx) olarak döndürür."""
     try:
-        # Geçici bir dosya adı oluştur
         dosya_adi = f"taslak_{hash(request.konu)}.docx"
         sonuc = draft_engine.taslak_ve_word_olustur(request.konu, dosya_adi)
         
-        # Dosyayı kullanıcıya indirilebilir olarak dönüyoruz
         return FileResponse(
             path=dosya_adi, 
             filename="Makale_Taslagi.docx",
@@ -245,16 +279,28 @@ async def generate_draft(request: DraftRequest):
 
 class SearchOpenAlexRequest(BaseModel):
     sorgu: str
-    limit: int = 5
+    limit: int = 10
     page: int = 1
     sort_by: str = "relevance"
-    min_year: int = None
+    min_year: Optional[int] = None
+    max_year: Optional[int] = None
+    scope: str = "tumu"
+    only_oa: bool = False
 
 @app.post("/api/literatur-tara")
 async def search_literature(request: SearchOpenAlexRequest):
-    """OpenAlex üzerinde açık erişim makaleleri tarar."""
+    """OpenAlex üzerinde açık erişim ve filtreli akademik makaleleri tarar."""
     try:
-        results = openalex_engine.search_articles(request.sorgu, request.limit, request.page, request.sort_by, request.min_year)
+        results = openalex_engine.search_articles(
+            query=request.sorgu, 
+            limit=request.limit, 
+            page=request.page, 
+            sort_by=request.sort_by, 
+            min_year=request.min_year,
+            max_year=request.max_year,
+            scope=request.scope,
+            only_oa=request.only_oa
+        )
         return {"mesaj": "Arama başarılı", "sonuclar": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -345,7 +391,7 @@ async def download_and_add_pdf(request: DownloadPDFRequest):
         )
         
         try:
-            analysis_llm = model_factory.get_gemini_llm(task="analysis")
+            analysis_llm = model_factory.get_llm(task="analysis")
             chain = prompt | analysis_llm | parser
             metadata_sonuc = chain.invoke({"text": ilk_sayfalar_metni})
         except Exception as llm_err:
@@ -427,6 +473,70 @@ class OnboardingRequest(BaseModel):
     storage_path: str
     api_mode: str = "system_default"
     custom_api_key: str = ""
+    provider: str = "gemini"
+    openrouter_api_key: str = ""
+
+class ApiKeyVerifyRequest(BaseModel):
+    provider: str = "auto"
+    api_key: str
+
+@app.post("/api/dogrula-api-anahtari")
+async def verify_api_key_endpoint(req: ApiKeyVerifyRequest):
+    """Kullanıcının girdiği API anahtarını doğrudan ilgili sağlayıcı servisi ile test eder."""
+    import urllib.request
+    import json
+    
+    key = req.api_key.strip()
+    if not key:
+        return {"gecerli": False, "mesaj": "API anahtarı boş olamaz."}
+    
+    provider = req.provider.lower()
+    if provider == "auto":
+        if key.startswith("sk-or-"):
+            provider = "openrouter"
+        elif key.startswith("AIzaSy"):
+            provider = "gemini"
+        elif key.startswith("sk-"):
+            provider = "openai"
+        else:
+            provider = "gemini"
+
+    if provider == "openrouter":
+        try:
+            req_obj = urllib.request.Request(
+                "https://openrouter.ai/api/v1/auth/key",
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "User-Agent": "ORTAC-Academic-Assistant/0.0.7"
+                }
+            )
+            with urllib.request.urlopen(req_obj, timeout=10) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    label = data.get("data", {}).get("label") or "OpenRouter Key"
+                    return {"gecerli": True, "provider": "openrouter", "mesaj": f"✓ OpenRouter bağlantısı başarılı! ({label})"}
+                else:
+                    return {"gecerli": False, "provider": "openrouter", "mesaj": f"OpenRouter hata döndürdü (Kod: {resp.status})"}
+        except urllib.error.HTTPError as he:
+            return {"gecerli": False, "provider": "openrouter", "mesaj": f"Yetkilendirme başarısız ({he.code}): Lütfen OpenRouter anahtarınızı kontrol edin."}
+        except Exception as e:
+            return {"gecerli": False, "provider": "openrouter", "mesaj": f"Bağlantı hatası: {str(e)}"}
+
+    elif provider == "gemini":
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
+            req_obj = urllib.request.Request(url, headers={"User-Agent": "ORTAC-Academic-Assistant/0.0.7"})
+            with urllib.request.urlopen(req_obj, timeout=10) as resp:
+                if resp.status == 200:
+                    return {"gecerli": True, "provider": "gemini", "mesaj": "✓ Google Gemini API bağlantısı başarılı!"}
+                else:
+                    return {"gecerli": False, "provider": "gemini", "mesaj": f"Gemini hata döndürdü (Kod: {resp.status})"}
+        except urllib.error.HTTPError as he:
+            return {"gecerli": False, "provider": "gemini", "mesaj": f"Yetkilendirme başarısız ({he.code}): Lütfen Google AI Studio anahtarınızı kontrol edin."}
+        except Exception as e:
+            return {"gecerli": False, "provider": "gemini", "mesaj": f"Bağlantı hatası: {str(e)}"}
+
+    return {"gecerli": False, "mesaj": f"Desteklenmeyen sağlayıcı: {provider}"}
 
 @app.get("/api/sistem-bilgisi")
 async def get_system_hardware_info():
@@ -535,8 +645,19 @@ async def complete_onboarding(request: OnboardingRequest):
         "models_dir": models_dir
     }
 
-    if request.api_mode == "custom_key" and request.custom_api_key.strip():
-        settings["api_keys"]["gemini"] = request.custom_api_key.strip()
+    # API Anahtarını ve Sağlayıcı Görev Eşleşmesini Güncelle
+    k = request.custom_api_key.strip() or request.openrouter_api_key.strip()
+    if k:
+        if k.startswith("sk-or-") or request.api_mode == "openrouter" or request.provider == "openrouter":
+            settings["api_keys"]["openrouter"] = k
+            settings["models"]["chat"] = {"label": "Genel Sohbet & RAG (Otomatik Ücretsiz Rota)", "provider": "openrouter", "model": "openrouter/free"}
+            settings["models"]["drafting"] = {"label": "Makale Taslağı (OpenDraft)", "provider": "openrouter", "model": "openrouter/free"}
+            settings["models"]["vision"] = {"label": "PDF & Doküman Analizi", "provider": "openrouter", "model": "openrouter/free"}
+        else:
+            settings["api_keys"]["gemini"] = k
+            settings["models"]["chat"] = {"label": "Genel Sohbet & RAG", "provider": "gemini", "model": "gemini-3.5-flash"}
+            settings["models"]["drafting"] = {"label": "Makale Taslağı (OpenDraft)", "provider": "gemini", "model": "gemini-3.5-flash"}
+            settings["models"]["vision"] = {"label": "PDF & Doküman Analizi", "provider": "gemini", "model": "gemini-3.5-flash-lite"}
 
     model_factory.save_settings(settings)
     rag.reset_rag_engine()
@@ -608,7 +729,7 @@ async def reset_onboarding():
     return {"mesaj": "Kurulum durumu sıfırlandı."}
 
 GITHUB_REPO = "GuneyOrtac/ortac-academic-assistant"
-CURRENT_VERSION = "0.0.5"
+CURRENT_VERSION = "0.0.7"
 
 @app.get("/api/guncelleme-kontrol")
 async def check_github_update():

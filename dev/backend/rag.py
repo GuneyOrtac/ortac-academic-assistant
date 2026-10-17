@@ -186,9 +186,13 @@ def pdf_vektorlestir_ve_kaydet(pdf_yolu: str, dosya_adi: str, metadata: dict):
         }
         documents.append(Document(page_content=chunk, metadata=doc_metadata))
     
-    # 4. ChromaDB'ye Kaydet
+    # 4. ChromaDB'ye Kaydet (Bellek ve CPU dostu 20'şerlik güvenli parçalar)
     vectorstore = get_vectorstore()
-    vectorstore.add_documents(documents)
+    batch_size = 20
+    for i in range(0, len(documents), batch_size):
+        batch = documents[i:i + batch_size]
+        print(f"[*] ChromaDB Vektör İndeksleme: {i + 1}-{min(i + batch_size, len(documents))}/{len(documents)} parça...")
+        vectorstore.add_documents(batch)
     
     return len(chunks)
 

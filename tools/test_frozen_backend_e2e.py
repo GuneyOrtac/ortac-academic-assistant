@@ -80,24 +80,27 @@ def run_frozen_simulation():
         except Exception:
             pass
 
-        print("\n[*] [1/5] AkademikAsistan_Backend.exe bağımsız Windows süreci olarak başlatılıyor...")
+        print("\n[*] [1/5] AkademikAsistan_Backend.exe bağımsız Windows süreci olarak başlatılıyor...", flush=True)
         proc = subprocess.Popen(
             [str(backend_exe)],
             cwd=str(backend_dir),
             env=isolated_env,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace"
         )
 
         # 4. Sağlık Kontrolü (Healthcheck Ping)
-        print("[*] [2/5] Backend açılışı ve port hazır oluşu bekleniyor...")
+        print("[*] [2/5] Backend açılışı ve port hazır oluşu bekleniyor...", flush=True)
         ready = False
         start_time = time.time()
-        while time.time() - start_time < 30:
+        while time.time() - start_time < 45:
             if proc.poll() is not None:
-                _, stderr = proc.communicate()
+                out, err = proc.communicate()
                 print(f"[!] HATA: Binary erkenden çöktü! Çıkış kodu: {proc.returncode}")
-                print(f"Stderr: {stderr.decode('utf-8', errors='replace')}")
+                print(f"STDOUT:\n{out}\nSTDERR:\n{err}")
                 return 1
             try:
                 res = requests.get(f"http://127.0.0.1:{test_port}/", timeout=1)
@@ -108,19 +111,22 @@ def run_frozen_simulation():
                 time.sleep(1)
 
         if not ready:
-            print("[!] HATA: Backend 30 saniye içinde yanıt vermedi!")
+            proc.terminate()
+            out, err = proc.communicate()
+            print("[!] HATA: Backend 45 saniye içinde yanıt vermedi!")
+            print(f"STDOUT:\n{out}\nSTDERR:\n{err}")
             return 1
 
         print("   -> [PASS] Backend derlenmiş .exe üzerinde başarıyla ayağa kalktı ve API yanıt veriyor!")
 
-        # 4.5. Sürüm Doğrulama (v0.0.5 kesin kontrolü)
+        # 4.5. Sürüm Doğrulama (v0.0.7 kesin kontrolü)
         v_res = requests.get(f"http://127.0.0.1:{test_port}/api/guncelleme-kontrol", timeout=5)
         if v_res.status_code == 200:
             v_data = v_res.json()
             cur_ver = v_data.get("mevcut_surum")
             print(f"   -> [PASS] Donmuş Backend Sürüm Doğrulaması: v{cur_ver}")
-            if cur_ver != "0.0.5":
-                print(f"[!] KRİTİK HATA: Beklenen sürüm 0.0.5 iken derlenmiş ikiliden v{cur_ver} döndü!")
+            if cur_ver != "0.0.7":
+                print(f"[!] KRİTİK HATA: Beklenen sürüm 0.0.7 iken derlenmiş ikiliden v{cur_ver} döndü!")
                 return 1
         else:
             print(f"[!] HATA: /api/guncelleme-kontrol yanıt vermedi! HTTP {v_res.status_code}")

@@ -23,6 +23,10 @@ def build_backend():
         # ChromaDB ve bağımlı paketlerin tüm veri dosyalarını ve alt modüllerini otomatik topla
         '--collect-all=chromadb',
         '--collect-submodules=langchain_chroma',
+        # OpenRouter / OpenAI LangChain paketleri
+        '--collect-all=langchain_openai',
+        '--collect-all=openai',
+        '--collect-all=docx',
         # Dinamik import edilen kritik modüller
         '--hidden-import=chromadb.telemetry.product.posthog',
         '--hidden-import=chromadb.segment.impl.metadata.sqlite',

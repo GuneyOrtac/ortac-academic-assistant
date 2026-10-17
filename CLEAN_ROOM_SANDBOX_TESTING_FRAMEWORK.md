@@ -358,3 +358,79 @@ Bu mimariyi sektördeki önde gelen açık kaynak masaüstü yapay zekâ ve akad
 2. **Paketleme Kuralı:**
    * Python tabanlı masaüstü uygulamalarında (*Khoj* ve *RAG-for-Zotero* gibi) en büyük risk dinamik modüllerdir (`posthog`, `onnxruntime`, `tokenizers`). Bizim getirdiğimiz **Donmuş Binary Simülasyon Kapısı (Frozen Binary Simulation Gate)**, bu açığı kapatan nihai sektörel çözümdür.
 
+---
+
+## 📌 10. Canlı Saha Testi Geri Bildirimleri & v0.0.7 Kapsamlı Düzeltme Matrisi
+**Tarih:** 17 Ekim 2026 | **Test Ortamı:** Gerçek Kullanıcı Windows Ortamı (F:// Sürücüsü Kurulumu) | **Durum:** İncelendi & Kayıt Altına Alındı
+
+Kullanıcı tarafından canlı sahada yapılan testler sonucunda tespit edilen 6 kritik bulgu, bunların teknik kök nedenleri ve v0.0.7 sürümü için planlanan kalıcı çözümler aşağıda kayıt altına alınmıştır:
+
+### 🔍 1. OpenRouter Model 404 Hatası (Sohbet Kilitlenmesi)
+* **Kullanıcı Hatası:**
+  ```text
+  Hata: Sohbet hatası: Error code: 404 - {'error': {'message': 'This model is unavailable for free. The paid version is available now - use this slug instead: nex-agi/nex-n2.5-pro', 'code': 404}, 'user_id': 'user_3KnBmSLRXgc7ZQLvUQd7Dmtt6su'}
+  ```
+* **Kök Neden:** OpenRouter sağlayıcısı, `nex-agi/nex-n2.5-pro` ve `nex-agi/nex-n2-pro` modellerini ücretsiz erişimden çekip ücretli plana taşımıştır. Bu nedenle bu modele yapılan çağrılar 404 döndürmekte ve sohbeti kilitlemektedir.
+* **Yarın Yapılacak Çözüm:**
+  1. Varsayılan modeli OpenRouter'ın resmi ve kesintisiz otomatik rotası olan **`openrouter/free`** olarak güncellemek. (Bu rota, OpenRouter üzerinde o an aktif olan en iyi ücretsiz modeli sıfır 404 riskiyle otomatik seçer; testimizde başarıyla Türkçe yanıt vermiştir).
+  2. OpenRouter üzerinde aktif ücretsiz çalışan diğer modelleri (`nvidia/nemotron-3-ultra-550b-a55b:free`, `google/gemma-4-26b-a4b-it:free`) Ayarlar menüsüne canlı liste olarak eklemek.
+  3. **Dinamik Fallback Motoru:** Bir model 404 veya 429 döndürdüğünde uygulamanın çökmesi engellenecek, sistem arka planda otomatik olarak çalışan ücretsiz modele geçiş yapacaktır.
+
+---
+
+### 🔍 2. Veritabanına PDF Yüklenememesi (Sonsuz Dönme & Model Yüklenmedi Hissi)
+* **Belirti:** "Veritabanına pdf yüklenmiyor. Buton dönüyor ama aktif bir işlem söz konusu değil. Bu da modelin hiç yüklenmediği izlenimi yaratıyor. Program F:// dizininde zaten yüklü."
+* **Kök Neden:**
+  1. `/api/belge-yukle` sürecinde belgenin ilk sayfalarından künye çıkarmak için `model_factory.get_llm(task="analysis")` çağrılmaktadır. Varsayılan model 404 döndüğü veya kilitlendiği için bu analiz yanıt beklemekte ve frontend sonsuz dönmektedir.
+  2. Yerel embedding modeli (`bge-m3`) ilk kez indirilirken arayüzde bir ilerleme çubuğu (progress bar) veya "Model İndiriliyor (%X)" bildirimi bulunmadığı için kullanıcı sistemin donduğunu düşünmektedir.
+  3. `F://` sürücüsü üzerindeki `MODELS_DIR` ve `veri/` dizini yollarının donmuş ortamdaki erişim izinleri.
+* **Yarın Yapılacak Çözüm:**
+  1. Künye analizinde LLM başarısız olursa veya 404 alırsa beklemeden anında PyMuPDF regex & başlık ayrıştırma fallback'i devreye girecek; PDF kaydı asla kilitlenmeyecektir.
+  2. Model yükleme/indirme sürecine frontend'de görünür ilerleme bildirimi ve durum göstergesi eklenecektir.
+
+---
+
+### 🔍 3. Kurulum Ekranının Görünmemesi (Silent / Background Install)
+* **Belirti:** Setup.exe çalıştırıldığında kurulum penceresi ekrana gelmeden arka planda işlem yapılması.
+* **Kök Neden:** NSIS yapılandırmasında `oneClick: false` ayarlanmış olsa dahi, Windows kayıt defterinde veya AppData altında önceki sürümlerden kalan kurulum bilgisi tespit edildiğinde NSIS "otomatik güncelleme" moduna geçerek GUI adımlarını atlayabilmektedir.
+* **Yarın Yapılacak Çözüm:**
+  - `electron-builder.json` / `package.json` NSIS bloğuna zorunlu GUI bayrakları eklenecektir:
+    ```json
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "displayLanguageSelector": false,
+      "installerHeader": "build/installerHeader.ico"
+    }
+    ```
+
+---
+
+### 🔍 4. Masaüstü İkonunun Gelmemesi
+* **Belirti:** Kurulum tamamlandıktan sonra masaüstünde uygulama kısayolu oluşmaması.
+* **Kök Neden:** NSIS `createDesktopShortcut` değeri açıkça `"always"` olarak sabitlenmediğinde, Windows kullanıcı izinlerine bağlı olarak kısayol yalnızca Başlat Menüsüne yazılabilmektedir.
+* **Yarın Yapılacak Çözüm:**
+  - `createDesktopShortcut: "always"` kuralı NSIS scriptine kilitlenecektir.
+
+---
+
+### 🔍 5. Gelişmiş Arama Harf Hataları (Fuzzy Search) & Akıllı Yoldaş Eksikliği
+* **Belirti:** "Gelişmiş arama harf hatalarını desteklemiyor. Beraberinde akıllı yoldaş ile arama yapılamıyor. Yapay zeka destekli bir arama hedefe yönelik yayın filtrelemesini otomatikleştirir."
+* **Kullanıcı İhtiyacı:**
+  1. Arama kutusunda Türkçe karakter (ı/i, ş/s, ğ/g, ü/u, ö/o, ç/c) ve yazım hatalarına toleranslı esnek arama (Fuzzy / Levenshtein matching).
+  2. **Akıllı Yoldaş (AI-Assisted Search Companion):** Kullanıcı doğal dille arama yaptığında (örn: *"deprem sonrası zemin sıvılaşması ile ilgili Q1 makaleler"*), yapay zekanın bunu akademik terimlere, anahtar sözcüklere, Türkçe/İngilizce eşanlamlılara ve yıl/yayın türü filtrelerine dönüştürerek OpenAlex ve yerel veritabanında hedefe yönelik aramayı otomatikleştirmesi.
+* **Yarın Yapılacak Çözüm:**
+  - Frontend ve backend yerel kütüphanesine fuzzy matching algoritması eklenmesi.
+  - `/api/akilli-arama` motorunun hayata geçirilerek doğal dil sorgularının otomatik akademik filtrelere dönüştürülmesi.
+
+---
+
+### 🎯 Yarınki Eylem Planı (v0.0.7 Kararlı Sürüm Odak Noktaları):
+1. **OpenRouter & Model Katmanı:** `openrouter/free` varsayılan yapılacak, 404 koruması ve otomatik fallback kurulacak.
+2. **PDF Motoru:** LLM bağımlılığı koparılacak, künye çıkarma regex fallback ile garantiye alınacak, embedding indirme durum göstergesi eklenecek.
+3. **NSIS Paketleme:** GUI kurulum penceresi ve masaüstü ikonu `always` ile kilitlenecek.
+4. **Akıllı Yoldaş & Fuzzy Arama:** Yazım hatası toleransı ve yapay zeka destekli filtreleme motoru entegre edilecek.
+5. **F:// Sürücüsü Doğrulaması:** Hedef sürücü izolasyonu temiz oda simülasyonunda F: dizini ile test edilecek.

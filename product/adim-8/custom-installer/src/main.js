@@ -16,13 +16,13 @@ let mainWindow = null;
 const EMBEDDING_PROFILES = {
   "bge-m3": {
     "id": "bge-m3",
-    "name": "Akademik Standart (BAAI/bge-m3)",
+    "name": "Akademik Standart • Önerilen (BAAI/bge-m3)",
     "hf_model": "BAAI/bge-m3",
     "download_size_gb": 2.2,
     "required_disk_gb": 22.2,
     "min_ram_gb": 16,
     "context_tokens": 8192,
-    "description": "8192 token kesintisiz bağlam, hibrit anlamsal + terimsel BM25 arama."
+    "description": "8192 token kesintisiz bağlam, hibrit anlamsal + terimsel BM25 arama. CPU'da 5-8 sn içinde hızla vektörleştirir."
   },
   "e5-small": {
     "id": "e5-small",
@@ -36,13 +36,13 @@ const EMBEDDING_PROFILES = {
   },
   "qwen2-7b": {
     "id": "qwen2-7b",
-    "name": "Zirve Güç (gte-Qwen2-7B-instruct)",
+    "name": "Zirve Güç (gte-Qwen2-7B-instruct • Harici GPU)",
     "hf_model": "Alibaba-NLP/gte-Qwen2-7B-instruct",
     "download_size_gb": 14.5,
     "required_disk_gb": 34.5,
     "min_ram_gb": 32,
     "context_tokens": 32768,
-    "description": "32.768 dev token penceresi, MTEB dünya 1.si anlamsal kavrayış."
+    "description": "32.768 dev token penceresi. DİKKAT: Yalnızca güçlü harici NVIDIA GPU ile önerilir; CPU'da aşırı yavaştır (PDF başına 10+ dk)."
   },
   "cloud-gemini": {
     "id": "cloud-gemini",

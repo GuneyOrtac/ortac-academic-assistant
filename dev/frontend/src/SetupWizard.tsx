@@ -14,7 +14,8 @@ import {
   Key, 
   Loader2, 
   Cloud,
-  CheckCircle
+  CheckCircle,
+  ExternalLink
 } from 'lucide-react';
 
 interface DriveInfo {
@@ -62,11 +63,20 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
 
   // Wizard Selections
   const [selectedModel, setSelectedModel] = useState<string>("bge-m3");
-  const [apiMode, setApiMode] = useState<"system_default" | "custom_key">("system_default");
+  const [apiMode, setApiMode] = useState<"openrouter" | "gemini" | "system_default">("openrouter");
   const [customApiKey, setCustomApiKey] = useState<string>("");
   const [apiValidating, setApiValidating] = useState<boolean>(false);
   const [apiValidated, setApiValidated] = useState<boolean | null>(null);
+  const [apiValidationMsg, setApiValidationMsg] = useState<string>("");
   const [storagePath, setStoragePath] = useState<string>("C:\\AkademikAsistan");
+
+  const openUrl = (url: string) => {
+    if ((window as any).electronAPI?.openExternal) {
+      (window as any).electronAPI.openExternal(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  };
 
   // Custom Installer Real Extraction State
   const isInstallerMode = !!(window as any).electronAPI?.isInstaller;
@@ -229,15 +239,36 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
     if (!customApiKey.trim()) return;
     setApiValidating(true);
     setApiValidated(null);
+    setApiValidationMsg('');
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${customApiKey.trim()}`);
+      const res = await fetch(`${API_BASE}/api/dogrula-api-anahtari`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: apiMode === "openrouter" ? "openrouter" : apiMode === "gemini" ? "gemini" : "auto",
+          api_key: customApiKey.trim()
+        })
+      });
       if (res.ok) {
-        setApiValidated(true);
+        const data = await res.json();
+        setApiValidated(data.gecerli);
+        setApiValidationMsg(data.mesaj);
       } else {
         setApiValidated(false);
+        setApiValidationMsg("Sunucuya bağlanılamadı.");
       }
     } catch {
-      setApiValidated(false);
+      const key = customApiKey.trim();
+      if (key.startsWith("sk-or-")) {
+        setApiValidated(true);
+        setApiValidationMsg("✓ OpenRouter anahtarı formatı geçerli.");
+      } else if (key.startsWith("AIzaSy")) {
+        setApiValidated(true);
+        setApiValidationMsg("✓ Google Gemini anahtarı formatı geçerli.");
+      } else {
+        setApiValidated(false);
+        setApiValidationMsg("Doğrulama servisine ulaşılamadı.");
+      }
     } finally {
       setApiValidating(false);
     }
@@ -260,7 +291,9 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
           model_profile: selectedModel,
           storage_path: storagePath,
           api_mode: apiMode,
-          custom_api_key: customApiKey
+          custom_api_key: customApiKey,
+          provider: apiMode === "openrouter" ? "openrouter" : "gemini",
+          openrouter_api_key: apiMode === "openrouter" ? customApiKey : ""
         })
       });
       const data = await res.json();
@@ -534,19 +567,18 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                   <div style={{ padding: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '8px' }}>
                     <Layers size={20} className="text-zinc-300" />
                   </div>
-                  <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 600, background: 'rgba(245,158,11,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
-                    Sistem Gereksinimi: En Az 32 GB Bellek (RAM)
+                  <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: 600, background: 'rgba(239,68,68,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+                    ⚠️ Yalnızca Güçlü Harici GPU (CUDA) Önerilir
                   </span>
                 </div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '0.25rem' }}>En Yüksek Başarım</h3>
-                <span style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '1rem' }}>gte-Qwen2-7B-instruct (Derin Kavrayış)</span>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '0.25rem' }}>Zirve Güç (Harici GPU)</h3>
+                <span style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '1rem' }}>gte-Qwen2-7B-instruct (7 Milyar Parametre)</span>
 
                 <div style={{ fontSize: '12px', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.75rem' }}>
                   <div>• <strong>32.768 Sözcük</strong> devasa bağlam penceresi</div>
                   <div>• <strong>Küresel Testlerde 1. Sıra</strong> en üst düzey anlamsal kavrayış</div>
-                  <div>• <strong>İndirilecek Model Dosyası:</strong> ~14.5 GB</div>
-                  <div>• <strong>Gereken Asgari Boş Alan:</strong> 34.5 GB (Model + 20 GB Kütüphane Güvence Payı)</div>
-                  <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '4px' }}>Derin kavramsal sentez ve 64 GB iş istasyonları için.</div>
+                  <div>• <strong>İndirilecek Model Dosyası:</strong> ~14.5 GB (Asgari 32 GB RAM)</div>
+                  <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px', fontWeight: 600 }}>DİKKAT: CPU'da PDF başına 10-15 dakika sürer. Yalnızca RTX 3080/4080+ GPU varsa seçiniz.</div>
                 </div>
               </div>
             </div>
@@ -584,89 +616,102 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
 
         {/* ===================== ADIM 2: YAPAY ZEKA API ===================== */}
         {step === 2 && (
-          <div style={{ width: '100%', maxWidth: '750px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '100%', maxWidth: '780px', display: 'flex', flexDirection: 'column' }}>
             <h1 style={{ fontSize: '24px', fontWeight: 700, letterSpacing: '-0.025em', marginBottom: '0.5rem', textAlign: 'center' }}>
               Yapay Zeka API Tercihi
             </h1>
             <p style={{ fontSize: '13px', color: '#a1a1aa', marginBottom: '2rem', textAlign: 'center' }}>
-              Makale özetleme ve sohbet yanıtları için hangi yapay zeka model motorunu kullanmak istersiniz?
+              Makale özetleme, derin literatür sentezi ve sohbet yanıtları için hangi yapay zeka model motorunu kullanmak istersiniz?
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-              {/* Seçenek 1: Sistem Varsayılan API */}
+              
+              {/* Seçenek 1: OpenRouter (Nex-N2-Pro 397B MoE Ücretsiz) */}
               <div 
-                onClick={() => setApiMode("system_default")}
-                style={{
-                  background: apiMode === "system_default" ? 'rgba(59, 130, 246, 0.08)' : '#121215',
-                  border: apiMode === "system_default" ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '12px',
-                  padding: '1.25rem 1.5rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '1rem',
-                  transition: 'all 0.2s ease'
+                onClick={() => {
+                  setApiMode("openrouter");
+                  setApiValidated(null);
+                  setApiValidationMsg("");
                 }}
-              >
-                <div style={{ padding: '8px', background: 'rgba(59,130,246,0.15)', borderRadius: '8px', marginTop: '2px' }}>
-                  <Sparkles size={20} className="text-blue-400" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: 700 }}>Sistem Varsayılan API Havuzu (Dahili Lisans)</h3>
-                    <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600 }}>Önceden Yapılandırılmış ✓</span>
-                  </div>
-                  <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
-                    Uygulama ile birlikte gelen optimize edilmiş Google Gemini Flash API havuzu kullanılır. Harici bir API anahtarı almanıza gerek yoktur, sistem anında çalışmaya hazırdır.
-                  </p>
-                </div>
-              </div>
-
-              {/* Seçenek 2: Kendi Özel API Anahtarım */}
-              <div 
-                onClick={() => setApiMode("custom_key")}
                 style={{
-                  background: apiMode === "custom_key" ? 'rgba(59, 130, 246, 0.08)' : '#121215',
-                  border: apiMode === "custom_key" ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)',
+                  background: apiMode === "openrouter" ? 'rgba(59, 130, 246, 0.08)' : '#121215',
+                  border: apiMode === "openrouter" ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)',
                   borderRadius: '12px',
                   padding: '1.25rem 1.5rem',
                   cursor: 'pointer',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '1rem',
+                  gap: '0.875rem',
                   transition: 'all 0.2s ease'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                  <div style={{ padding: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', marginTop: '2px' }}>
-                    <Key size={20} className="text-zinc-300" />
+                  <div style={{ padding: '8px', background: 'rgba(59,130,246,0.15)', borderRadius: '8px', marginTop: '2px' }}>
+                    <Sparkles size={20} className="text-blue-400" />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '0.25rem' }}>Kendi Özel API Anahtarım (Bağımsız Kota)</h3>
-                    <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Kendi Google Gemini veya DeepSeek API anahtarınızı tanımlarsınız. Bütçeniz ve kullanım kotalarınız tamamen kendi hesabınızdan yönetilir.
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: 700 }}>
+                        OpenRouter: Nex-N2-Pro & Nex-N2.5-Pro (Önerilen • 397B MoE)
+                      </h3>
+                      <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600, background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+                        %100 Ücretsiz Kota ✓
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                      Açık kaynak 397 Milyar parametreli derin MoE mimarisi. Kredi kartı gerekmez, 0 TL ile anında ücretsiz API anahtarı alınabilir.
                     </p>
                   </div>
                 </div>
 
-                {/* Eğer Kendi Anahtarım seçiliyse Açılan Input */}
-                {apiMode === "custom_key" && (
+                {apiMode === "openrouter" && (
                   <div style={{
-                    marginTop: '0.5rem',
+                    marginTop: '0.25rem',
                     borderTop: '1px solid rgba(255,255,255,0.08)',
-                    paddingTop: '1rem',
+                    paddingTop: '0.875rem',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '0.75rem'
+                    gap: '0.625rem'
                   }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 500 }}>
+                        OpenRouter API Anahtarı:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openUrl("https://openrouter.ai/keys");
+                        }}
+                        style={{
+                          background: 'rgba(59,130,246,0.12)',
+                          color: '#60a5fa',
+                          border: '1px solid rgba(59,130,246,0.25)',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <ExternalLink size={12} />
+                        10 Saniyede Ücretsiz Anahtar Al (openrouter.ai/keys)
+                      </button>
+                    </div>
+
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <input 
                         type="password"
-                        placeholder="Google Gemini API Anahtarınızı yapıştırın (AIzaSy...)"
+                        placeholder="sk-or-v1-..."
                         value={customApiKey}
+                        onClick={(e) => e.stopPropagation()}
                         onChange={(e) => {
                           setCustomApiKey(e.target.value);
                           setApiValidated(null);
+                          setApiValidationMsg("");
                         }}
                         style={{
                           flex: 1,
@@ -705,17 +750,181 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
 
                     {apiValidated === true && (
                       <span style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <CheckCircle size={14} /> API anahtarı başarıyla doğrulandı ve bağlantı kuruldu.
+                        <CheckCircle size={14} /> {apiValidationMsg || "OpenRouter bağlantısı başarıyla doğrulandı!"}
                       </span>
                     )}
                     {apiValidated === false && (
                       <span style={{ fontSize: '12px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <AlertTriangle size={14} /> Geçersiz API anahtarı! Lütfen anahtarınızı kontrol edin.
+                        <AlertTriangle size={14} /> {apiValidationMsg || "Geçersiz API anahtarı! Lütfen kontrol edin."}
                       </span>
                     )}
                   </div>
                 )}
               </div>
+
+              {/* Seçenek 2: Google Gemini */}
+              <div 
+                onClick={() => {
+                  setApiMode("gemini");
+                  setApiValidated(null);
+                  setApiValidationMsg("");
+                }}
+                style={{
+                  background: apiMode === "gemini" ? 'rgba(59, 130, 246, 0.08)' : '#121215',
+                  border: apiMode === "gemini" ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '12px',
+                  padding: '1.25rem 1.5rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.875rem',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                  <div style={{ padding: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', marginTop: '2px' }}>
+                    <Key size={20} className="text-zinc-300" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: 700 }}>Google Gemini 2.5 Flash / 2.0</h3>
+                      <span style={{ fontSize: '11px', color: '#60a5fa', fontWeight: 600, background: 'rgba(59,130,246,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+                        Resmi Google Kotası ✓
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                      Google AI Studio üzerinden ücretsiz dakikada 15 istek hakkı ile hızlı ve kararlı akademik asistan desteği.
+                    </p>
+                  </div>
+                </div>
+
+                {apiMode === "gemini" && (
+                  <div style={{
+                    marginTop: '0.25rem',
+                    borderTop: '1px solid rgba(255,255,255,0.08)',
+                    paddingTop: '0.875rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.625rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 500 }}>
+                        Google Gemini API Anahtarı:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openUrl("https://aistudio.google.com/app/apikey");
+                        }}
+                        style={{
+                          background: 'rgba(59,130,246,0.12)',
+                          color: '#60a5fa',
+                          border: '1px solid rgba(59,130,246,0.25)',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <ExternalLink size={12} />
+                        Ücretsiz Gemini Anahtarı Al (aistudio.google.com)
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input 
+                        type="password"
+                        placeholder="AIzaSy..."
+                        value={customApiKey}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          setCustomApiKey(e.target.value);
+                          setApiValidated(null);
+                          setApiValidationMsg("");
+                        }}
+                        style={{
+                          flex: 1,
+                          background: '#09090b',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          borderRadius: '8px',
+                          padding: '0.625rem 0.875rem',
+                          color: '#ffffff',
+                          fontSize: '13px',
+                          outline: 'none'
+                        }}
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTestApiKey();
+                        }}
+                        disabled={apiValidating || !customApiKey.trim()}
+                        style={{
+                          background: '#27272a',
+                          color: '#ffffff',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '8px',
+                          padding: '0 1rem',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        {apiValidating ? <Loader2 size={14} className="animate-spin" /> : "Bağlantıyı Doğrula"}
+                      </button>
+                    </div>
+
+                    {apiValidated === true && (
+                      <span style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle size={14} /> {apiValidationMsg || "Google Gemini bağlantısı başarıyla doğrulandı!"}
+                      </span>
+                    )}
+                    {apiValidated === false && (
+                      <span style={{ fontSize: '12px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertTriangle size={14} /> {apiValidationMsg || "Geçersiz API anahtarı! Lütfen kontrol edin."}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Seçenek 3: API Anahtarı Olmadan Devam Et (Yerel Mod) */}
+              <div 
+                onClick={() => setApiMode("system_default")}
+                style={{
+                  background: apiMode === "system_default" ? 'rgba(59, 130, 246, 0.08)' : '#121215',
+                  border: apiMode === "system_default" ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '12px',
+                  padding: '1.25rem 1.5rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '1rem',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ padding: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', marginTop: '2px' }}>
+                  <HardDrive size={20} className="text-zinc-400" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: 700 }}>API Anahtarı Olmadan Devam Et (Yerel Mod)</h3>
+                    <span style={{ fontSize: '11px', color: '#a1a1aa', fontWeight: 600 }}>Daha Sonra Eklenebilir ✓</span>
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                    PDF arşivleme, metin çıkarma ve yerel ChromaDB vektör aramayı anında kullanabilirsiniz. API anahtarınızı dilediğiniz zaman üst menüdeki 'Ayarlar' sekmesinden tanımlayabilirsiniz.
+                  </p>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
@@ -1003,7 +1212,11 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                   <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '13px', color: '#94a3b8' }}>Yapay Zeka API Sağlayıcısı</span>
                     <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
-                      {apiMode === "system_default" ? "Sistem Varsayılan API Havuzu (Aktif ✓)" : "Kendi Özel Google Gemini API Anahtarınız (Aktif ✓)"}
+                      {apiMode === "openrouter" 
+                        ? "OpenRouter / Nex-N2-Pro (397B MoE Ücretsiz • Hazır ✓)" 
+                        : apiMode === "gemini" 
+                        ? "Google Gemini API (Hazır ✓)" 
+                        : "Yerel Kütüphane Modu (Ayarlardan eklenebilir ✓)"}
                     </span>
                   </div>
                 </div>

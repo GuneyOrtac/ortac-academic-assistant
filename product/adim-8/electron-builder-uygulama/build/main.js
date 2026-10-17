@@ -247,3 +247,15 @@ ipcMain.handle('app:create-shortcut', async () => {
     return { success: false, error: err.message };
   }
 });
+
+ipcMain.handle('app:open-external', async (_, url) => {
+  try {
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      await shell.openExternal(url);
+      return { success: true };
+    }
+  } catch (err) {
+    log(`[ELECTRON] openExternal hatası: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+});

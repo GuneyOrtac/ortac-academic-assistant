@@ -14,6 +14,7 @@ interface Message {
   text: string;
   sender: 'user' | 'ai';
   sources?: string[];
+  articles?: any[];
 }
 
 interface Article {
@@ -66,10 +67,16 @@ function App() {
   const [radarPage, setRadarPage] = useState(1);
   const [hiddenRadarIds, setHiddenRadarIds] = useState<string[]>([]);
   const [addedRadarIds, setAddedRadarIds] = useState<string[]>([]);
+  const [radarScope, setRadarScope] = useState<'tumu' | 'yerli' | 'yabanci'>('tumu');
+  const [radarMinYear, setRadarMinYear] = useState<string>('');
+  const [radarMaxYear, setRadarMaxYear] = useState<string>('');
+  const [radarOnlyOa, setRadarOnlyOa] = useState<boolean>(false);
+  const [radarSortBy, setRadarSortBy] = useState<'relevance' | 'citations' | 'date'>('relevance');
 
   // Draft State
   const [draftContent, setDraftContent] = useState('');
-  const [isDraftLoading] = useState(false);
+  const [isDraftLoading, setIsDraftLoading] = useState(false);
+  const [isDownloadingDocx, setIsDownloadingDocx] = useState(false);
   const [draftTopic, setDraftTopic] = useState('');
   
   const joditConfig = useMemo(() => ({
@@ -188,14 +195,32 @@ function App() {
     handleRadarSearch(radarQuery);
   }, []);
 
-  const handleRadarSearch = async (query: string = radarQuery, page: number = 1, append: boolean = false) => {
+  const handleRadarSearch = async (
+    query: string = radarQuery, 
+    page: number = 1, 
+    append: boolean = false,
+    scope: string = radarScope,
+    minYear: string = radarMinYear,
+    maxYear: string = radarMaxYear,
+    onlyOa: boolean = radarOnlyOa,
+    sortBy: string = radarSortBy
+  ) => {
     if (!query.trim()) return;
     setIsRadarLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/literatur-tara`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sorgu: query, limit: 10, page: page })
+        body: JSON.stringify({ 
+          sorgu: query, 
+          limit: 10, 
+          page: page,
+          sort_by: sortBy,
+          min_year: minYear ? parseInt(minYear) : null,
+          max_year: maxYear ? parseInt(maxYear) : null,
+          scope: scope,
+          only_oa: onlyOa
+        })
       });
       if (res.ok) {
         const data = await res.json();
@@ -318,7 +343,8 @@ function App() {
         id: Date.now() + 1,
         text: finalYanit,
         sender: 'ai',
-        sources: sourceInfo
+        sources: sourceInfo,
+        articles: data.bulunan_makaleler || []
       }]);
     } catch (error: any) {
       setMessages(prev => [...prev, {
@@ -328,6 +354,70 @@ function App() {
       }]);
     } finally {
       setIsChatLoading(false);
+    }
+  };
+
+  // OpenDraft Metin Üretme (LLM)
+  const handleGenerateDraft = async () => {
+    if (!draftTopic.trim()) return;
+    setIsDraftLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/taslak-metin-uret`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ konu: draftTopic.trim() })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.html) {
+          setDraftContent(data.html);
+        }
+      } else {
+        alert("Taslak üretilirken bir hata oluştu. Lütfen Ayarlar sekmesinden API anahtarınızı kontrol ediniz.");
+      }
+    } catch (e: any) {
+      alert("Bağlantı hatası: " + e.message);
+    } finally {
+      setIsDraftLoading(false);
+    }
+  };
+
+  // OpenDraft Word (.docx) İndirme
+  const handleDownloadDocx = async () => {
+    const cleanText = draftContent.replace(/<[^>]+>/g, '').trim();
+    if (!cleanText) {
+      alert("Lütfen önce taslak alanına bir metin yazın veya 'Yapay Zeka ile Üret' butonunu kullanarak taslak oluşturun.");
+      return;
+    }
+    setIsDownloadingDocx(true);
+    try {
+      const res = await fetch(`${API_URL}/api/taslak-indir`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          html_icerik: draftContent,
+          baslik: draftTopic.trim() || "Makale Taslağı"
+        })
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const filename = `${(draftTopic.trim() || 'Makale_Taslagi').replace(/[\s\/\\:*?"<>|]/g, '_')}.docx`;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } else {
+        const err = await res.json();
+        alert("Word indirme hatası: " + (err.detail || "Bilinmeyen hata"));
+      }
+    } catch (e: any) {
+      alert("Sunucuya bağlanılamadı: " + e.message);
+    } finally {
+      setIsDownloadingDocx(false);
     }
   };
 
@@ -501,7 +591,7 @@ function App() {
         </div>
         
         <div className="sidebar-footer">
-          <span className="footer-text">Versiyon {appUpdateInfo?.mevcut_surum || "0.0.5"}</span>
+          <span className="footer-text">Versiyon {appUpdateInfo?.mevcut_surum || "0.0.7"}</span>
           <span className="footer-name">Dr. Güney ORTAÇ</span>
           <span className="footer-text">© Tüm Hakları Saklıdır</span>
         </div>
@@ -543,7 +633,7 @@ function App() {
               </span>
             ) : (
               <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
-                v{appUpdateInfo?.mevcut_surum || "0.0.5"} (Güncel ✓)
+                v{appUpdateInfo?.mevcut_surum || "0.0.6"} (Güncel ✓)
               </span>
             )}
           </div>
@@ -732,6 +822,86 @@ function App() {
                 </button>
               </div>
 
+              {/* Gelişmiş Filtre Çubuğu */}
+              <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', background: 'var(--bg-card)', padding: '0.75rem 1rem', borderRadius: '6px', border: '1px solid var(--border-color)'}}>
+                {/* Kapsam / Scope Butonları */}
+                <div style={{display: 'flex', gap: '4px', background: 'var(--bg-sidebar)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-color)'}}>
+                  {[
+                    { id: 'tumu', label: '🌐 Tümü' },
+                    { id: 'yerli', label: '🇹🇷 Yerli (TR)' },
+                    { id: 'yabanci', label: '🌍 Yabancı' }
+                  ].map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        setRadarScope(s.id as any);
+                        handleRadarSearch(radarQuery, 1, false, s.id as any, radarMinYear, radarMaxYear, radarOnlyOa, radarSortBy);
+                      }}
+                      style={{
+                        padding: '4px 10px', fontSize: '12px', fontWeight: 500, borderRadius: '4px', border: 'none', cursor: 'pointer',
+                        backgroundColor: radarScope === s.id ? 'var(--accent-color)' : 'transparent',
+                        color: radarScope === s.id ? 'white' : 'var(--text-muted)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Yıl Aralığı */}
+                <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--text-muted)'}}>
+                  <span>Yıl:</span>
+                  <input
+                    type="number"
+                    placeholder="Başlangıç"
+                    value={radarMinYear}
+                    onChange={(e) => setRadarMinYear(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleRadarSearch(radarQuery, 1, false, radarScope, radarMinYear, radarMaxYear, radarOnlyOa, radarSortBy)}
+                    style={{width: '70px', padding: '4px 6px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', outline: 'none', background: 'var(--bg-card)', color: 'var(--text-color)'}}
+                  />
+                  <span>-</span>
+                  <input
+                    type="number"
+                    placeholder="Bitiş"
+                    value={radarMaxYear}
+                    onChange={(e) => setRadarMaxYear(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleRadarSearch(radarQuery, 1, false, radarScope, radarMinYear, radarMaxYear, radarOnlyOa, radarSortBy)}
+                    style={{width: '70px', padding: '4px 6px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', outline: 'none', background: 'var(--bg-card)', color: 'var(--text-color)'}}
+                  />
+                </div>
+
+                {/* Açık Erişim Checkbox */}
+                <label style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-color)', cursor: 'pointer'}}>
+                  <input
+                    type="checkbox"
+                    checked={radarOnlyOa}
+                    onChange={(e) => {
+                      setRadarOnlyOa(e.target.checked);
+                      handleRadarSearch(radarQuery, 1, false, radarScope, radarMinYear, radarMaxYear, e.target.checked, radarSortBy);
+                    }}
+                  />
+                  <span>Sadece Açık Erişim</span>
+                </label>
+
+                {/* Sıralama */}
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto'}}>
+                  <span style={{fontSize: '12px', color: 'var(--text-muted)'}}>Sırala:</span>
+                  <select
+                    value={radarSortBy}
+                    onChange={(e) => {
+                      setRadarSortBy(e.target.value as any);
+                      handleRadarSearch(radarQuery, 1, false, radarScope, radarMinYear, radarMaxYear, radarOnlyOa, e.target.value as any);
+                    }}
+                    style={{padding: '4px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-color)'}}
+                  >
+                    <option value="relevance">En İlgili</option>
+                    <option value="citations">En Çok Atıf Alan</option>
+                    <option value="date">En Yeni</option>
+                  </select>
+                </div>
+              </div>
+
               <div style={{display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem'}}>
                 <button onClick={handleHideSeen} style={{fontSize: '13px', fontWeight: 500, padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-color)'}}>
                   <EyeOff size={14} />
@@ -762,14 +932,27 @@ function App() {
                     <div>
                       <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
                         <h3 style={{fontSize:'16px', fontWeight:600, color:'var(--text-color)', marginBottom:'0.5rem', lineHeight:'1.4'}}>{art.title}</h3>
-                        {art.is_oa ? (
-                          <span style={{background:'#e6f4ea', color:'#137333', fontSize:'11px', fontWeight:600, padding:'4px 8px', borderRadius:'12px', whiteSpace:'nowrap', marginLeft:'1rem'}}>Açık Erişim (PDF)</span>
-                        ) : (
-                          <span style={{background:'#f3f4f6', color:'#4b5563', fontSize:'11px', fontWeight:600, padding:'4px 8px', borderRadius:'12px', whiteSpace:'nowrap', marginLeft:'1rem'}}>Kapalı Kaynak</span>
-                        )}
+                        <div style={{display: 'flex', gap: '6px', alignItems: 'center', marginLeft: '1rem', flexShrink: 0}}>
+                          <span style={{
+                            background: art.is_yerli ? '#fef3c7' : '#e0e7ff',
+                            color: art.is_yerli ? '#92400e' : '#3730a3',
+                            fontSize:'11px', fontWeight:600, padding:'4px 8px', borderRadius:'12px', whiteSpace:'nowrap'
+                          }}>
+                            {art.is_yerli ? '🇹🇷 Yerli (TR)' : '🌍 Uluslararası'}
+                          </span>
+                          {art.is_oa ? (
+                            <span style={{background:'#e6f4ea', color:'#137333', fontSize:'11px', fontWeight:600, padding:'4px 8px', borderRadius:'12px', whiteSpace:'nowrap'}}>Açık Erişim (PDF)</span>
+                          ) : (
+                            <span style={{background:'#f3f4f6', color:'#4b5563', fontSize:'11px', fontWeight:600, padding:'4px 8px', borderRadius:'12px', whiteSpace:'nowrap'}}>Kapalı Kaynak</span>
+                          )}
+                        </div>
                       </div>
                       <div style={{fontSize:'13px', color:'var(--accent-color)', fontWeight:500, marginBottom:'0.25rem'}}>{art.authors.join(', ')}</div>
-                      <div style={{fontSize:'12px', color:'var(--text-muted)'}}>Yıl: {art.publication_year} • Tür: {(art.type || "belirsiz").replace('-', ' ').toUpperCase()}</div>
+                      <div style={{fontSize:'12px', color:'var(--text-muted)'}}>
+                        Yıl: {art.publication_year} • Tür: {(art.type || "belirsiz").replace('-', ' ').toUpperCase()}
+                        {art.cited_by_count > 0 ? ` • Atıf: ${art.cited_by_count}` : ''}
+                        {art.source_name ? ` • Dergi/Kurum: ${art.source_name}` : ''}
+                      </div>
                     </div>
                     
                     <div style={{display:'flex', gap:'1rem', marginTop:'0.5rem', borderTop:'1px solid var(--border-color)', paddingTop:'1rem'}}>
@@ -1069,14 +1252,18 @@ function App() {
                     display: 'flex', alignItems: 'center', gap: '0.5rem',
                     backgroundColor: 'var(--accent-color)', color: 'white',
                     padding: '0.5rem 1rem', borderRadius: '6px',
-                    border: 'none', cursor: 'pointer', fontWeight: 500,
+                    border: 'none', cursor: isDownloadingDocx ? 'default' : 'pointer', fontWeight: 500,
                     fontSize: '13px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                     transition: 'background 0.2s'
                   }}
+                  disabled={isDownloadingDocx}
                   onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
                   onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-color)'}
+                  onClick={handleDownloadDocx}
+                  title="Mevcut taslak metnini Word (.docx) olarak indir"
                 >
-                  <Download size={14} /> Word Olarak İndir
+                  {isDownloadingDocx ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  {isDownloadingDocx ? "Word Hazırlanıyor..." : "Word Olarak İndir"}
                 </button>
               </div>
             </div>
@@ -1088,20 +1275,21 @@ function App() {
                   style={{flex: 1, padding: '0.75rem 1rem', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none', fontSize: '14px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)'}}
                   value={draftTopic}
                   onChange={(e) => setDraftTopic(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleGenerateDraft()}
                />
                <button 
                   style={{
                     backgroundColor: '#10b981', color: 'white',
                     padding: '0 1.5rem', borderRadius: '6px',
-                    border: 'none', cursor: 'pointer', fontWeight: 600,
+                    border: 'none', cursor: (isDraftLoading || !draftTopic.trim()) ? 'default' : 'pointer', fontWeight: 600,
                     fontSize: '14px', display: 'flex', alignItems:'center', gap:'0.5rem',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                   }}
                   disabled={isDraftLoading || !draftTopic.trim()}
-                  onClick={() => {/* will implement API call */}}
+                  onClick={handleGenerateDraft}
                 >
                   {isDraftLoading ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-                  Yapay Zeka ile Üret
+                  {isDraftLoading ? "Taslak Üretiliyor..." : "Yapay Zeka ile Üret"}
                 </button>
             </div>
             
@@ -1131,7 +1319,92 @@ function App() {
             <div key={msg.id} className={`chat-bubble ${msg.sender}`}>
               <div className="avatar">{msg.sender === 'ai' ? 'AA' : 'G'}</div>
               <div className="chat-text">
-                {msg.text}
+                <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+                {msg.articles && msg.articles.length > 0 && (
+                  <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {msg.articles.map((art: any) => (
+                      <div key={art.id} style={{
+                        backgroundColor: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '6px',
+                        padding: '0.6rem 0.75rem',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                      }}>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '4px', alignItems: 'center' }}>
+                          <span style={{
+                            fontSize: '10px', fontWeight: 600, padding: '2px 6px', borderRadius: '4px',
+                            backgroundColor: art.is_yerli ? '#fef3c7' : '#e0e7ff',
+                            color: art.is_yerli ? '#92400e' : '#3730a3'
+                          }}>
+                            {art.is_yerli ? '🇹🇷 Yerli' : '🌍 Uluslararası'}
+                          </span>
+                          {art.is_oa && (
+                            <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#dcfce7', color: '#166534' }}>
+                              🔓 Açık Erişim
+                            </span>
+                          )}
+                          {art.publication_year && (
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                              📅 {art.publication_year}
+                            </span>
+                          )}
+                          {art.cited_by_count > 0 && (
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                              ⭐ {art.cited_by_count} Atıf
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', lineHeight: 1.35, marginBottom: '4px' }}>
+                          {art.title}
+                        </div>
+
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                          {art.authors?.slice(0, 2).join(', ')}{art.authors?.length > 2 ? ' vd.' : ''}
+                          {art.source_name && ` • ${art.source_name}`}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px' }}>
+                          {art.is_oa && art.open_access_url ? (
+                            <button
+                              onClick={() => handleDownloadPdf(art.open_access_url, art.title, art.id)}
+                              disabled={downloadingMap[art.id] !== undefined}
+                              style={{
+                                fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '4px',
+                                border: 'none', cursor: downloadingMap[art.id] !== undefined ? 'default' : 'pointer',
+                                color: 'white',
+                                background: downloadingMap[art.id] !== undefined 
+                                  ? (downloadingMap[art.id] >= 100 ? '#10b981' : '#f59e0b')
+                                  : 'var(--accent-color)',
+                                display: 'flex', alignItems: 'center', gap: '4px'
+                              }}
+                            >
+                              {downloadingMap[art.id] !== undefined ? (
+                                downloadingMap[art.id] >= 100 ? <Database size={12} /> : <Loader2 size={12} className="animate-spin" />
+                              ) : <Download size={12} />}
+                              {downloadingMap[art.id] !== undefined ? (downloadingMap[art.id] >= 100 ? "Kütüphaneye Eklendi" : "İndiriliyor...") : "Kütüphaneme Ekle"}
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>🔒 Kapalı Kaynak</span>
+                          )}
+
+                          {art.doi && (
+                            <button
+                              onClick={() => window.open(art.doi, '_blank')}
+                              style={{
+                                fontSize: '11px', padding: '4px 8px', borderRadius: '4px',
+                                border: '1px solid var(--border-color)', background: 'transparent',
+                                color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px'
+                              }}
+                            >
+                              <ExternalLink size={11} /> DOI
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {msg.sources && msg.sources.length > 0 && (
                   <div style={{ marginTop: '0.75rem', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
                     <strong>Kaynaklar: </strong> {msg.sources.join(', ')}

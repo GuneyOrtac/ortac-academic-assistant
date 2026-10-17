@@ -87,20 +87,24 @@ LEGACY_MODEL_MAP = {
     "gpt-4o": "gemini-3.5-flash",
     "deepseek-chat": "gemini-3.5-flash",
     "meta/llama-3.1-70b-instruct": "gemini-3.5-flash",
-    "meta/llama-3.2-11b-vision-instruct": "gemini-3.5-flash-lite"
+    "meta/llama-3.2-11b-vision-instruct": "gemini-3.5-flash-lite",
+    "nex-agi/nex-n2.5-pro:free": "openrouter/free",
+    "nex-agi/nex-n2-pro:free": "openrouter/free",
+    "nex-agi/nex-n2.5-pro": "openrouter/free",
+    "nex-agi/nex-n2-pro": "openrouter/free"
 }
 
 # Embedding Modeli Profilleri ve Donanım Şartnamesi
 EMBEDDING_PROFILES = {
     "bge-m3": {
         "id": "bge-m3",
-        "name": "Akademik Standart (BAAI/bge-m3)",
+        "name": "Akademik Standart • Önerilen (BAAI/bge-m3)",
         "hf_model": "BAAI/bge-m3",
         "download_size_gb": 2.2,
         "required_disk_gb": 22.2,
         "min_ram_gb": 16,
         "context_tokens": 8192,
-        "description": "8192 token kesintisiz bağlam, hibrit anlamsal + terimsel BM25 arama."
+        "description": "8192 token kesintisiz bağlam, hibrit anlamsal + terimsel BM25 arama. CPU'da 5-8 sn içinde ışık hızında vektörleştirir."
     },
     "e5-small": {
         "id": "e5-small",
@@ -114,13 +118,13 @@ EMBEDDING_PROFILES = {
     },
     "qwen2-7b": {
         "id": "qwen2-7b",
-        "name": "Zirve Güç (gte-Qwen2-7B-instruct)",
+        "name": "Zirve Güç (gte-Qwen2-7B-instruct • Yalnızca Harici GPU)",
         "hf_model": "Alibaba-NLP/gte-Qwen2-7B-instruct",
         "download_size_gb": 14.5,
         "required_disk_gb": 34.5,
         "min_ram_gb": 32,
         "context_tokens": 32768,
-        "description": "32.768 dev token penceresi, MTEB dünya 1.si anlamsal kavrayış."
+        "description": "32.768 dev token penceresi. DİKKAT: Yalnızca güçlü harici NVIDIA GPU (CUDA) ile önerilir. CPU'da aşırı yavaştır (PDF başına 10+ dk)."
     },
     "cloud-gemini": {
         "id": "cloud-gemini",
@@ -157,6 +161,7 @@ def get_settings() -> dict:
         },
         "api_keys": {
             "gemini": gemini_env_key or DEFAULT_SYSTEM_KEY,
+            "openrouter": os.getenv("OPENROUTER_API_KEY", ""),
             "openai": os.getenv("OPENAI_API_KEY", ""),
             "deepseek": os.getenv("DEEPSEEK_API_KEY", ""),
             "perplexity": os.getenv("PERPLEXITY_API_KEY", ""),
@@ -210,8 +215,15 @@ def get_settings() -> dict:
                     for task_name, cfg in data["models"].items():
                         current_m = cfg.get("model", "")
                         if current_m in LEGACY_MODEL_MAP:
-                            cfg["model"] = LEGACY_MODEL_MAP[current_m]
-                            cfg["provider"] = "gemini"
+                            target_m = LEGACY_MODEL_MAP[current_m]
+                            cfg["model"] = target_m
+                            if "openrouter" in target_m:
+                                cfg["provider"] = "openrouter"
+                            else:
+                                cfg["provider"] = "gemini"
+                        elif "nex-agi" in current_m:
+                            cfg["model"] = "openrouter/free"
+                            cfg["provider"] = "openrouter"
                 return data
         except Exception as e:
             print(f"Ayarlar dosyası okunamadı: {e}")
@@ -269,6 +281,11 @@ def save_settings(settings_data: dict):
         os.environ["GOOGLE_API_KEY"] = gemini_key
         update_env_file("GEMINI_API_KEY", gemini_key)
 
+    openrouter_key = current.get("api_keys", {}).get("openrouter", "").strip()
+    if openrouter_key:
+        os.environ["OPENROUTER_API_KEY"] = openrouter_key
+        update_env_file("OPENROUTER_API_KEY", openrouter_key)
+
 def get_gemini_api_key() -> str:
     """Aktif Gemini API anahtarını döner."""
     settings = get_settings()
@@ -284,20 +301,82 @@ def is_gemini_configured() -> bool:
     key = get_gemini_api_key()
     return bool(key and key != "bekleniyor" and not key.startswith("AQ.Ab8") and len(key) > 15)
 
-def get_gemini_llm(task: str = "chat", model_override: str = None, temperature: float = None):
-    """
-    Göreve ve bütçeye göre en optimize Gemini modelini döner.
-    - 'analysis': PDF künye ve özet çıkarma (En ucuz & süper hızlı: gemini-3.1-flash-lite)
-    - 'chat': Kütüphane ve RAG soru-cevap (Gelişmiş akıl yürütme & hızlı: gemini-3.8-flash)
-    - 'drafting': Makale taslağı ve sentezleme (Yüksek kaliteli sentez & ekonomik: gemini-3.8-flash)
-    """
-    api_key = get_gemini_api_key()
-    if not api_key or not is_gemini_configured():
-        raise ValueError("Google Gemini API anahtarı bulunamadı! Lütfen arayüzdeki 'Ayarlar' sekmesinden API anahtarınızı kaydedin.")
+def get_openrouter_api_key() -> str:
+    """Aktif OpenRouter API anahtarını döner."""
+    settings = get_settings()
+    key = settings.get("api_keys", {}).get("openrouter", "").strip()
+    if not key:
+        key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    return key
 
+def is_openrouter_configured() -> bool:
+    """OpenRouter API anahtarının tanımlı olup olmadığını döner."""
+    key = get_openrouter_api_key()
+    return bool(key and len(key) > 10)
+
+def is_llm_configured(task: str = "chat") -> bool:
+    """Aktif görev için yapılandırılmış bir LLM sağlayıcısı (Gemini veya OpenRouter) olup olmadığını döner."""
     settings = get_settings()
     models_cfg = settings.get("models", {})
+    provider = models_cfg.get(task, {}).get("provider", "gemini")
+    if provider == "openrouter":
+        return is_openrouter_configured()
+    return is_gemini_configured() or is_openrouter_configured()
 
+def get_llm(task: str = "chat", model_override: str = None, temperature: float = None):
+    """
+    Göreve ve kullanıcı tercihine göre LLM örneği (Gemini veya OpenRouter / Nex-N2-Pro) döner.
+    """
+    settings = get_settings()
+    models_cfg = settings.get("models", {})
+    provider = models_cfg.get(task, {}).get("provider", "gemini")
+    
+    # 1. OpenRouter Sağlayıcısı (Örn: openrouter/free, nvidia/nemotron, gemma)
+    if provider == "openrouter" or (model_override and ("openrouter" in model_override or "nex-agi" in model_override)):
+        openrouter_key = get_openrouter_api_key()
+        if not openrouter_key:
+            if is_gemini_configured():
+                print("[!] OpenRouter API anahtarı bulunamadı, varsayılan Gemini'ye geçiliyor.")
+                return _get_gemini_instance(task, model_override, temperature, settings)
+            raise ValueError("OpenRouter API anahtarı bulunamadı! Lütfen 'Ayarlar' sekmesinden OpenRouter anahtarınızı kaydedin.")
+            
+        model_name = model_override or models_cfg.get(task, {}).get("model", "openrouter/free")
+        if "nex-agi" in model_name or model_name in LEGACY_MODEL_MAP:
+            model_name = LEGACY_MODEL_MAP.get(model_name, "openrouter/free")
+
+        if temperature is None:
+            temperature = 0.2 if task == "analysis" else 0.4
+            
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            model=model_name,
+            openai_api_base="https://openrouter.ai/api/v1",
+            openai_api_key=openrouter_key,
+            temperature=temperature,
+            request_timeout=25,
+            max_retries=2
+        )
+
+    # 2. Standart Gemini Sağlayıcısı
+    return _get_gemini_instance(task, model_override, temperature, settings)
+
+def _get_gemini_instance(task: str, model_override: str, temperature: float, settings: dict):
+    api_key = get_gemini_api_key()
+    if not api_key or not is_gemini_configured():
+        if is_openrouter_configured():
+            print("[!] Gemini yapılandırılmamış, OpenRouter Ücretsiz Rota devreye alınıyor.")
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                model="openrouter/free",
+                openai_api_base="https://openrouter.ai/api/v1",
+                openai_api_key=get_openrouter_api_key(),
+                temperature=temperature or 0.3,
+                request_timeout=25,
+                max_retries=2
+            )
+        raise ValueError("Yapay zeka motoru için geçerli bir API anahtarı bulunamadı! Lütfen arayüzdeki 'Ayarlar' sekmesinden Gemini veya OpenRouter anahtarınızı kaydedin.")
+
+    models_cfg = settings.get("models", {})
     if model_override:
         model_name = model_override
     elif task == "analysis":
@@ -313,7 +392,6 @@ def get_gemini_llm(task: str = "chat", model_override: str = None, temperature: 
         if temperature is None:
             temperature = 0.3
 
-    # Eski veya geçersiz model adlarını güvenli güncel modele dönüştür
     if model_name in LEGACY_MODEL_MAP:
         model_name = LEGACY_MODEL_MAP[model_name]
 
@@ -334,3 +412,6 @@ def get_gemini_llm(task: str = "chat", model_override: str = None, temperature: 
             google_api_key=api_key,
             temperature=temperature
         )
+
+# Geriye dönük tam uyumluluk için alias
+get_gemini_llm = get_llm

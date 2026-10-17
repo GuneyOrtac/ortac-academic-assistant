@@ -16,10 +16,18 @@ interface SettingsData {
   onboarding_completed?: boolean;
 }
 
-const providers = ['gemini', 'openai', 'deepseek', 'perplexity', 'anthropic', 'groq', 'nvidia'];
+const providers = ['gemini', 'openrouter', 'openai', 'deepseek', 'perplexity', 'anthropic', 'groq', 'nvidia'];
 
 const modelOptions: Record<string, string[]> = {
   gemini: ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-flash-latest'],
+  openrouter: [
+    'openrouter/free',
+    'nvidia/nemotron-3-ultra-550b-a55b:free',
+    'google/gemma-4-26b-a4b-it:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'deepseek/deepseek-chat:free',
+    'qwen/qwen-2.5-72b-instruct:free'
+  ],
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo', 'o1-preview', 'o1-mini'],
   deepseek: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'],
   perplexity: ['llama-3.1-sonar-small-128k-chat', 'llama-3.1-sonar-large-128k-chat', 'llama-3.1-sonar-huge-128k-chat', 'llama-3.1-sonar-small-128k-online', 'llama-3.1-sonar-large-128k-online', 'llama-3.1-sonar-huge-128k-online'],
@@ -159,6 +167,7 @@ export default function SettingsTab() {
       .then(res => res.json())
       .then(data => {
         // Migration if missing
+        if (!data.api_keys.openrouter) data.api_keys.openrouter = "";
         if (!data.api_keys.anthropic) data.api_keys.anthropic = "";
         if (!data.api_keys.groq) data.api_keys.groq = "";
         
@@ -338,12 +347,48 @@ export default function SettingsTab() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {providers.map(provider => (
               <div key={provider}>
-                <label style={{ display: 'block', fontSize: '13px', marginBottom: '5px', fontWeight: 500, textTransform: 'capitalize' }}>{provider} API Key</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, textTransform: 'capitalize' }}>
+                    {provider === 'openrouter' ? 'OpenRouter (Nex-N2-Pro / MoE)' : `${provider} API Key`}
+                  </label>
+                  {provider === 'openrouter' && (
+                    <a 
+                      href="https://openrouter.ai/keys" 
+                      target="_blank" 
+                      rel="noreferrer"
+                      onClick={(e) => {
+                        if ((window as any).electronAPI?.openExternal) {
+                          e.preventDefault();
+                          (window as any).electronAPI.openExternal("https://openrouter.ai/keys");
+                        }
+                      }}
+                      style={{ fontSize: '11px', color: '#60a5fa', textDecoration: 'none', fontWeight: 500 }}
+                    >
+                      Ücretsiz Anahtar Al ↗
+                    </a>
+                  )}
+                  {provider === 'gemini' && (
+                    <a 
+                      href="https://aistudio.google.com/app/apikey" 
+                      target="_blank" 
+                      rel="noreferrer"
+                      onClick={(e) => {
+                        if ((window as any).electronAPI?.openExternal) {
+                          e.preventDefault();
+                          (window as any).electronAPI.openExternal("https://aistudio.google.com/app/apikey");
+                        }
+                      }}
+                      style={{ fontSize: '11px', color: '#60a5fa', textDecoration: 'none', fontWeight: 500 }}
+                    >
+                      Ücretsiz Anahtar Al ↗
+                    </a>
+                  )}
+                </div>
                 <input 
                   type="password" 
                   value={settings.api_keys[provider] || ''} 
                   onChange={(e) => handleApiKeyChange(provider, e.target.value)}
-                  placeholder={`${provider.charAt(0).toUpperCase() + provider.slice(1)} api key...`}
+                  placeholder={provider === 'openrouter' ? 'sk-or-v1-...' : `${provider.charAt(0).toUpperCase() + provider.slice(1)} api key...`}
                   style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}
                 />
               </div>
@@ -392,9 +437,9 @@ export default function SettingsTab() {
                 onClick={handleSyncLibrary}
                 disabled={syncing}
                 style={{
-                  backgroundColor: '#27272a',
-                  color: '#f4f4f5',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  backgroundColor: '#ffffff',
+                  color: '#1e293b',
+                  border: '1px solid #cbd5e1',
                   padding: '8px 16px',
                   borderRadius: '6px',
                   fontSize: '13px',
@@ -402,7 +447,8 @@ export default function SettingsTab() {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                 }}
               >
                 {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
@@ -420,9 +466,9 @@ export default function SettingsTab() {
                   }
                 }}
                 style={{
-                  backgroundColor: '#27272a',
-                  color: '#f4f4f5',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  backgroundColor: '#ffffff',
+                  color: '#1e293b',
+                  border: '1px solid #cbd5e1',
                   padding: '8px 16px',
                   borderRadius: '6px',
                   fontSize: '13px',
@@ -430,7 +476,8 @@ export default function SettingsTab() {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                 }}
               >
                 <RefreshCw size={14} /> Sihirbazı Başlat
@@ -439,39 +486,39 @@ export default function SettingsTab() {
           </div>
 
           {syncMsg && (
-            <div style={{ padding: '10px 14px', borderRadius: '6px', backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: '13px' }}>
+            <div style={{ padding: '10px 14px', borderRadius: '6px', backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#059669', fontSize: '13px', fontWeight: 500 }}>
               {syncMsg}
             </div>
           )}
 
           {settings.workspace && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px', background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block' }}>📁 Ana Depolama Yolu:</span>
-                <span style={{ color: '#e4e4e7', fontFamily: 'monospace' }}>{settings.workspace.storage_path}</span>
+                <span style={{ color: '#475569', display: 'block', fontWeight: 500, marginBottom: '2px' }}>📁 Ana Depolama Yolu:</span>
+                <span style={{ color: '#0f172a', fontFamily: 'monospace', fontWeight: 600, wordBreak: 'break-all' }}>{settings.workspace.storage_path}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block' }}>🧠 ChromaDB Vektör Veritabanı:</span>
-                <span style={{ color: '#3b82f6', fontFamily: 'monospace' }}>{settings.workspace.chroma_dir}</span>
+                <span style={{ color: '#475569', display: 'block', fontWeight: 500, marginBottom: '2px' }}>🧠 ChromaDB Vektör Veritabanı:</span>
+                <span style={{ color: '#2563eb', fontFamily: 'monospace', fontWeight: 600, wordBreak: 'break-all' }}>{settings.workspace.chroma_dir}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block' }}>📚 PDF Kütüphanesi:</span>
-                <span style={{ color: '#e4e4e7', fontFamily: 'monospace' }}>{settings.workspace.pdf_dir}</span>
+                <span style={{ color: '#475569', display: 'block', fontWeight: 500, marginBottom: '2px' }}>📚 PDF Kütüphanesi:</span>
+                <span style={{ color: '#0f172a', fontFamily: 'monospace', fontWeight: 600, wordBreak: 'break-all' }}>{settings.workspace.pdf_dir}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block' }}>🤖 Yerel Model Önbelleği (HF):</span>
-                <span style={{ color: '#10b981', fontFamily: 'monospace' }}>{settings.workspace.models_dir || (settings.workspace.storage_path + '\\modeller')}</span>
+                <span style={{ color: '#475569', display: 'block', fontWeight: 500, marginBottom: '2px' }}>🤖 Yerel Model Önbelleği (HF):</span>
+                <span style={{ color: '#059669', fontFamily: 'monospace', fontWeight: 600, wordBreak: 'break-all' }}>{settings.workspace.models_dir || (settings.workspace.storage_path + '\\modeller')}</span>
               </div>
             </div>
           )}
 
           {/* Aktif Vektörleştirme (Embedding) Modeli Seçimi */}
-          <div style={{ marginTop: '4px', padding: '14px', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ marginTop: '4px', padding: '14px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
                 🧠 Vektörleştirme (RAG Embedding) Modeli Tercihi:
               </span>
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+              <span style={{ fontSize: '11px', color: '#64748b' }}>
                 Değişikliklerin kaydedilmesi için yukarıdaki "Kaydet" butonuna basınız.
               </span>
             </div>
@@ -489,15 +536,16 @@ export default function SettingsTab() {
                     padding: '10px 12px',
                     borderRadius: '6px',
                     cursor: 'pointer',
-                    background: (settings.embedding_profile || 'bge-m3') === profile.id ? 'rgba(59,130,246,0.15)' : '#18181b',
-                    border: (settings.embedding_profile || 'bge-m3') === profile.id ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.06)',
+                    background: (settings.embedding_profile || 'bge-m3') === profile.id ? 'rgba(59,130,246,0.1)' : '#ffffff',
+                    border: (settings.embedding_profile || 'bge-m3') === profile.id ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: (settings.embedding_profile || 'bge-m3') === profile.id ? '#60a5fa' : '#e4e4e7' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: (settings.embedding_profile || 'bge-m3') === profile.id ? '#1d4ed8' : '#0f172a' }}>
                     {profile.name}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
                     {profile.desc}
                   </div>
                 </div>
@@ -512,10 +560,10 @@ export default function SettingsTab() {
             <div>
               <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <GitBranch size={16} style={{ color: 'var(--accent-color)' }} />
-                GitHub Otomatik Güncelleme ve Sürüm Kontrolü (Adım 8)
+                GitHub Otomatik Güncelleme ve Sürüm Kontrolü
               </h3>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Doğrudan GitHub Releases (GuneyOrtac/ortac-academic-assistant) üzerinden yeni özellikleri denetleyin ve tek tıkla güncelleyin.
+                Doğrudan GitHub Releases üzerinden yeni özellikleri denetleyin ve tek tıkla güncelleyin.
               </p>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -523,9 +571,9 @@ export default function SettingsTab() {
                 onClick={handleCheckUpdate}
                 disabled={checkingUpdate}
                 style={{
-                  backgroundColor: '#27272a',
-                  color: '#f4f4f5',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  backgroundColor: '#ffffff',
+                  color: '#1e293b',
+                  border: '1px solid #cbd5e1',
                   padding: '8px 16px',
                   borderRadius: '6px',
                   fontSize: '13px',
@@ -533,7 +581,8 @@ export default function SettingsTab() {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                 }}
               >
                 {checkingUpdate ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
@@ -553,7 +602,8 @@ export default function SettingsTab() {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                 }}
               >
                 {updating ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
@@ -563,32 +613,32 @@ export default function SettingsTab() {
           </div>
 
           {updateProgress && updateProgress.status === 'downloading' && (
-            <div style={{ marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '6px', padding: '14px', border: '1px solid rgba(59,130,246,0.3)' }}>
+            <div style={{ marginTop: '6px', backgroundColor: '#eff6ff', borderRadius: '6px', padding: '14px', border: '1px solid #bfdbfe' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
-                <span style={{ color: '#60a5fa', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: '#1d4ed8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Loader2 size={14} className="animate-spin" />
                   Güncelleme Paketi İndiriliyor: %{updateProgress.percent}
                 </span>
-                <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                <span style={{ color: '#475569', fontFamily: 'monospace' }}>
                   {updateProgress.downloaded_mb} MB / {updateProgress.total_mb} MB
                 </span>
               </div>
-              <div style={{ width: '100%', height: '8px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: '8px', backgroundColor: '#dbeafe', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{ width: `${updateProgress.percent}%`, height: '100%', backgroundColor: 'var(--accent-color)', transition: 'width 0.2s ease' }} />
               </div>
-              <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
+              <span style={{ display: 'block', fontSize: '11px', color: '#64748b', marginTop: '8px' }}>
                 Dosya doğrudan uygulama içinde güvenle indiriliyor. İndirme bittiğinde kurulum penceresi ekranınızda otomatik açılacaktır.
               </span>
             </div>
           )}
 
           {updateProgress && updateProgress.status === 'completed' && (
-            <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '14px 16px' }}>
+            <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '14px 16px' }}>
               <div>
-                <span style={{ color: '#34d399', fontSize: '13px', fontWeight: 600, display: 'block' }}>
+                <span style={{ color: '#15803d', fontSize: '13px', fontWeight: 600, display: 'block' }}>
                   ✓ Güncelleme Paketi Başarıyla İndirildi ({updateProgress.total_mb} MB)
                 </span>
-                <span style={{ color: '#cbd5e1', fontSize: '12px', marginTop: '2px', display: 'block' }}>
+                <span style={{ color: '#1e293b', fontSize: '12px', marginTop: '2px', display: 'block' }}>
                   Kurulum sihirbazı penceresi arka planda çağrıldı. Açılmadıysa aşağıdaki butonları kullanarak kurulumu hemen başlatabilir veya dosyayı klasörde görüntüleyebilirsiniz.
                 </span>
               </div>
@@ -601,7 +651,7 @@ export default function SettingsTab() {
                 </button>
                 <button
                   onClick={handleOpenInstallerFolder}
-                  style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.2)', padding: '8px 14px', borderRadius: '4px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  style={{ backgroundColor: '#ffffff', color: '#1e293b', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '4px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}
                 >
                   📁 Klasörde Göster
                 </button>
@@ -610,7 +660,7 @@ export default function SettingsTab() {
           )}
 
           {updateMsg && (!updateProgress || updateProgress.status === 'idle' || updateProgress.status === 'error') && (
-            <div style={{ padding: '10px 14px', borderRadius: '6px', backgroundColor: updateProgress?.status === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)', border: updateProgress?.status === 'error' ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(59,130,246,0.3)', color: updateProgress?.status === 'error' ? '#f87171' : '#60a5fa', fontSize: '13px' }}>
+            <div style={{ padding: '10px 14px', borderRadius: '6px', backgroundColor: updateProgress?.status === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)', border: updateProgress?.status === 'error' ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(59,130,246,0.3)', color: updateProgress?.status === 'error' ? '#b91c1c' : '#1d4ed8', fontSize: '13px', fontWeight: 500 }}>
               {updateMsg}
             </div>
           )}
@@ -618,15 +668,15 @@ export default function SettingsTab() {
           {updateStatus && (
             <div style={{ padding: '12px 16px', borderRadius: '6px', backgroundColor: updateStatus.guncel_mi ? 'rgba(16,185,129,0.08)' : 'rgba(59,130,246,0.12)', border: updateStatus.guncel_mi ? '1px solid rgba(16,185,129,0.25)' : '1px solid #3b82f6', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, color: updateStatus.guncel_mi ? '#34d399' : '#60a5fa' }}>
+                <span style={{ fontWeight: 600, color: updateStatus.guncel_mi ? '#15803d' : '#1d4ed8' }}>
                   {updateStatus.guncel_mi ? `✓ Sisteminiz en son sürümde (v${updateStatus.mevcut_surum}) çalışıyor.` : `🚀 Yeni Sürüm Mevcut: v${updateStatus.son_surum}`}
                 </span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '11px', color: '#64748b' }}>
                   Mevcut: v{updateStatus.mevcut_surum} • GitHub: v{updateStatus.son_surum}
                 </span>
               </div>
               {updateStatus.surum_notlari && !updateStatus.guncel_mi && (
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: '12px', color: '#cbd5e1', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '4px' }}>
+                <div style={{ whiteSpace: 'pre-wrap', fontSize: '12px', color: '#1e293b', background: '#ffffff', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '4px' }}>
                   {updateStatus.surum_notlari}
                 </div>
               )}

@@ -1,6 +1,6 @@
 {
   "name": "ortac-akademik-asistan-kurulum",
-  "version": "0.0.4",
+  "version": "0.0.7",
   "description": "ORTAC Geo|Science - Akademik Asistan Kurulum Sihirbazı",
   "main": "src/main.js",
   "scripts": {

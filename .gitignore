@@ -69,3 +69,7 @@ product/adim-8/electron-builder-uygulama/dist/
 
 # Testing & Sandbox
 .sandbox_circuit_breaker.json
+API_KEYS.txt
+product/adim-8/app_staging/
+product/adim-8/new_app.asar
+

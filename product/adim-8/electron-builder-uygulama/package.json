@@ -1,6 +1,6 @@
 {
   "name": "akademik-asistan",
-  "version": "0.0.5",
+  "version": "0.0.7",
   "description": "ORTAC Geo|Science - Akademik Asistan",
   "main": "build/main.js",
   "scripts": {
@@ -61,8 +61,8 @@
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": false,
-      "createDesktopShortcut": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
       "shortcutName": "ORTAC Akademik Asistan",
       "runAfterFinish": true,
